@@ -1,4 +1,313 @@
+<script lang="ts">
+  import { push } from "svelte-spa-router";
+  import { api, ApiError } from "../lib/api";
+  import type { ItemOut, ListOut } from "../lib/types";
+  import { clearToken } from "../stores/auth";
+
+  export let params: { listId?: string } = {};
+
+  let list: ListOut | null = null;
+  let items: ItemOut[] = [];
+  let loading = true;
+  let error: string | null = null;
+  let listName = "";
+  let savingName = false;
+
+  let newItemName = "";
+  let newItemQty = "";
+  let newItemUnit = "";
+  let newItemSort = "0";
+  let creatingItem = false;
+
+  let editingItemId: string | null = null;
+  let editName = "";
+  let editQty = "";
+  let editUnit = "";
+  let editSort = "0";
+  let savingItem = false;
+
+  let currentListId = "";
+
+  const parseOptionalNumber = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const parsed = Number(trimmed);
+    return Number.isNaN(parsed) ? null : parsed;
+  };
+
+  const parseSortOrder = (value: string) => {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  };
+
+  const sortItems = (nextItems: ItemOut[]) =>
+    [...nextItems].sort((a, b) => {
+      if (a.sort_order !== b.sort_order) {
+        return a.sort_order - b.sort_order;
+      }
+      return (
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
+    });
+
+  const loadList = async (listId: string) => {
+    loading = true;
+    error = null;
+    try {
+      const [listData, itemData] = await Promise.all([
+        api.getList(listId),
+        api.listItems(listId),
+      ]);
+      list = listData;
+      listName = listData.name;
+      items = sortItems(itemData);
+    } catch (err) {
+      error = err instanceof ApiError ? err.detail || err.message : "Load failed.";
+    } finally {
+      loading = false;
+    }
+  };
+
+  const updateListName = async () => {
+    if (!list || savingName) return;
+    const name = listName.trim();
+    if (!name) return;
+    savingName = true;
+    error = null;
+    try {
+      list = await api.updateList(list.id, { name });
+      listName = list.name;
+    } catch (err) {
+      error = err instanceof ApiError ? err.detail || err.message : "Update failed.";
+    } finally {
+      savingName = false;
+    }
+  };
+
+  const createItem = async () => {
+    if (!list || creatingItem) return;
+    const name = newItemName.trim();
+    if (!name) return;
+    creatingItem = true;
+    error = null;
+    try {
+      const payload = {
+        name,
+        qty: parseOptionalNumber(newItemQty),
+        unit: newItemUnit.trim() || null,
+        sort_order: parseSortOrder(newItemSort),
+      };
+      const created = await api.createItem(list.id, payload);
+      items = sortItems([...items, created]);
+      newItemName = "";
+      newItemQty = "";
+      newItemUnit = "";
+      newItemSort = "0";
+    } catch (err) {
+      error = err instanceof ApiError ? err.detail || err.message : "Create failed.";
+    } finally {
+      creatingItem = false;
+    }
+  };
+
+  const toggleItem = async (itemId: string) => {
+    error = null;
+    try {
+      const updated = await api.toggleItem(itemId);
+      items = sortItems(
+        items.map((item) => (item.id === itemId ? updated : item))
+      );
+    } catch (err) {
+      error = err instanceof ApiError ? err.detail || err.message : "Toggle failed.";
+    }
+  };
+
+  const deleteItem = async (itemId: string) => {
+    if (!window.confirm("Delete this item?")) return;
+    error = null;
+    try {
+      await api.deleteItem(itemId);
+      items = items.filter((item) => item.id !== itemId);
+    } catch (err) {
+      error = err instanceof ApiError ? err.detail || err.message : "Delete failed.";
+    }
+  };
+
+  const startEditItem = (item: ItemOut) => {
+    editingItemId = item.id;
+    editName = item.name;
+    editQty = item.qty?.toString() ?? "";
+    editUnit = item.unit ?? "";
+    editSort = item.sort_order.toString();
+  };
+
+  const cancelEditItem = () => {
+    editingItemId = null;
+  };
+
+  const saveItem = async (itemId: string) => {
+    if (savingItem) return;
+    const name = editName.trim();
+    if (!name) return;
+    savingItem = true;
+    error = null;
+    try {
+      const payload = {
+        name,
+        qty: parseOptionalNumber(editQty),
+        unit: editUnit.trim() || null,
+        sort_order: parseSortOrder(editSort),
+      };
+      const updated = await api.updateItem(itemId, payload);
+      items = sortItems(
+        items.map((item) => (item.id === itemId ? updated : item))
+      );
+      editingItemId = null;
+    } catch (err) {
+      error = err instanceof ApiError ? err.detail || err.message : "Update failed.";
+    } finally {
+      savingItem = false;
+    }
+  };
+
+  const logout = () => {
+    clearToken();
+    push("/login");
+  };
+
+  $: if (params.listId && params.listId !== currentListId) {
+    currentListId = params.listId;
+    loadList(currentListId);
+  }
+</script>
+
 <main>
-  <h1>List</h1>
-  <p>Edit list items and details.</p>
+  <header class="page-header">
+    <div>
+      <h1>{list ? list.name : "List"}</h1>
+      <p>Manage items and keep things in sync.</p>
+    </div>
+    <div class="nav-links">
+      <button class="button ghost" on:click={() => push("/lists")}>All lists</button>
+      <button class="button ghost" on:click={() => push("/templates")}>
+        Templates
+      </button>
+      <button class="button secondary" on:click={logout}>Sign out</button>
+    </div>
+  </header>
+
+  {#if loading}
+    <p class="meta">Loading list...</p>
+  {:else if error}
+    <p class="meta">{error}</p>
+  {:else if !list}
+    <p class="meta">List not found.</p>
+  {:else}
+    <section class="card stack">
+      <div class="row">
+        <div>
+          <h2>List details</h2>
+          <p class="meta">Rename the list to keep it current.</p>
+        </div>
+        <div class="toolbar">
+          <input class="input" bind:value={listName} />
+          <button class="button" disabled={savingName} on:click={updateListName}>
+            {savingName ? "Saving..." : "Save name"}
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card stack">
+      <div>
+        <h2>Items</h2>
+        <p class="meta">Add, edit, or tick items as you shop.</p>
+      </div>
+
+      <div class="inline-form">
+        <input class="input" placeholder="Item name" bind:value={newItemName} />
+        <div class="flex">
+          <input
+            class="input"
+            placeholder="Qty"
+            bind:value={newItemQty}
+          />
+          <input
+            class="input"
+            placeholder="Unit"
+            bind:value={newItemUnit}
+          />
+          <input
+            class="input"
+            placeholder="Sort"
+            bind:value={newItemSort}
+          />
+          <button class="button" disabled={creatingItem} on:click={createItem}>
+            {creatingItem ? "Adding..." : "Add item"}
+          </button>
+        </div>
+      </div>
+
+      {#if items.length === 0}
+        <p class="meta">No items yet.</p>
+      {:else}
+        <div class="stack">
+          {#each items as item}
+            <div class="card">
+              {#if editingItemId === item.id}
+                <div class="inline-form">
+                  <input class="input" bind:value={editName} />
+                  <div class="flex">
+                    <input class="input" placeholder="Qty" bind:value={editQty} />
+                    <input class="input" placeholder="Unit" bind:value={editUnit} />
+                    <input class="input" placeholder="Sort" bind:value={editSort} />
+                  </div>
+                  <div class="toolbar">
+                    <button
+                      class="button"
+                      disabled={savingItem}
+                      on:click={() => saveItem(item.id)}
+                    >
+                      {savingItem ? "Saving..." : "Save"}
+                    </button>
+                    <button class="button ghost" on:click={cancelEditItem}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              {:else}
+                <div class="item-row">
+                  <div>
+                    <h3>{item.name}</h3>
+                    <div class="meta">
+                      {#if item.qty !== null && item.qty !== undefined}
+                        {item.qty}
+                      {/if}
+                      {#if item.unit}
+                        {" "}{item.unit}
+                      {/if}
+                      {#if item.sort_order !== undefined && item.sort_order !== null}
+                        <span class="pill">Order {item.sort_order}</span>
+                      {/if}
+                    </div>
+                  </div>
+                  <div class="toolbar">
+                    <button class="button" on:click={() => toggleItem(item.id)}>
+                      {item.purchased ? "Unmark" : "Mark bought"}
+                    </button>
+                    <button class="button ghost" on:click={() => startEditItem(item)}>
+                      Edit
+                    </button>
+                    <button class="button danger" on:click={() => deleteItem(item.id)}>
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              {/if}
+            </div>
+          {/each}
+        </div>
+      {/if}
+    </section>
+  {/if}
 </main>
