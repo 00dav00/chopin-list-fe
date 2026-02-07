@@ -1,0 +1,106 @@
+export type UserOut = {
+  id: string;
+  email?: string | null;
+  name?: string | null;
+  avatar_url?: string | null;
+  created_at: string;
+  last_login_at?: string | null;
+};
+
+export type ListOut = {
+  id: string;
+  user_id: string;
+  name: string;
+  template_id?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ListCreate = {
+  name: string;
+  template_id?: string | null;
+};
+
+export type ListUpdate = {
+  name?: string | null;
+};
+
+export type ItemOut = {
+  id: string;
+  user_id: string;
+  list_id: string;
+  name: string;
+  qty?: number | null;
+  unit?: string | null;
+  purchased: boolean;
+  purchased_at?: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ItemCreate = {
+  name: string;
+  qty?: number | null;
+  unit?: string | null;
+  sort_order?: number;
+};
+
+export type ItemUpdate = {
+  name?: string | null;
+  qty?: number | null;
+  unit?: string | null;
+  sort_order?: number | null;
+  purchased?: boolean | null;
+};
+
+export type TemplateOut = {
+  id: string;
+  user_id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TemplateItemOut = {
+  id: string;
+  user_id: string;
+  template_id: string;
+  name: string;
+  qty?: number | null;
+  unit?: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TemplateDetailOut = TemplateOut & {
+  items: TemplateItemOut[];
+};
+
+export type TemplateItemCreate = {
+  name: string;
+  qty?: number | null;
+  unit?: string | null;
+  sort_order?: number;
+};
+
+export type TemplateItemUpdate = {
+  name?: string | null;
+  qty?: number | null;
+  unit?: string | null;
+  sort_order?: number | null;
+};
+
+export type TemplateCreate = {
+  name: string;
+  items?: TemplateItemCreate[];
+};
+
+export type TemplateUpdate = {
+  name?: string | null;
+};
+
+export type CreateListFromTemplate = {
+  name?: string | null;
+};
