@@ -1,6 +1,7 @@
 <script lang="ts">
   import { push } from "svelte-spa-router";
-  import { api, ApiError } from "../lib/api";
+  import { api } from "../lib/api";
+  import { getApiErrorMessage } from "../lib/errors";
   import type { ItemOut, ListOut } from "../lib/types";
   import { clearToken } from "../stores/auth";
 
@@ -62,7 +63,10 @@
       listName = listData.name;
       items = sortItems(itemData);
     } catch (err) {
-      error = err instanceof ApiError ? err.detail || err.message : "Load failed.";
+      const message = getApiErrorMessage(err, "Load failed.");
+      if (message) {
+        error = message;
+      }
     } finally {
       loading = false;
     }
@@ -78,7 +82,10 @@
       list = await api.updateList(list.id, { name });
       listName = list.name;
     } catch (err) {
-      error = err instanceof ApiError ? err.detail || err.message : "Update failed.";
+      const message = getApiErrorMessage(err, "Update failed.");
+      if (message) {
+        error = message;
+      }
     } finally {
       savingName = false;
     }
@@ -104,7 +111,10 @@
       newItemUnit = "";
       newItemSort = "0";
     } catch (err) {
-      error = err instanceof ApiError ? err.detail || err.message : "Create failed.";
+      const message = getApiErrorMessage(err, "Create failed.");
+      if (message) {
+        error = message;
+      }
     } finally {
       creatingItem = false;
     }
@@ -118,7 +128,10 @@
         items.map((item) => (item.id === itemId ? updated : item))
       );
     } catch (err) {
-      error = err instanceof ApiError ? err.detail || err.message : "Toggle failed.";
+      const message = getApiErrorMessage(err, "Toggle failed.");
+      if (message) {
+        error = message;
+      }
     }
   };
 
@@ -129,7 +142,10 @@
       await api.deleteItem(itemId);
       items = items.filter((item) => item.id !== itemId);
     } catch (err) {
-      error = err instanceof ApiError ? err.detail || err.message : "Delete failed.";
+      const message = getApiErrorMessage(err, "Delete failed.");
+      if (message) {
+        error = message;
+      }
     }
   };
 
@@ -164,7 +180,10 @@
       );
       editingItemId = null;
     } catch (err) {
-      error = err instanceof ApiError ? err.detail || err.message : "Update failed.";
+      const message = getApiErrorMessage(err, "Update failed.");
+      if (message) {
+        error = message;
+      }
     } finally {
       savingItem = false;
     }

@@ -1,10 +1,13 @@
 <script lang="ts">
   import Router, { location, push } from "svelte-spa-router";
   import { onMount } from "svelte";
+  import { setUnauthorizedHandler } from "./lib/api";
   import {
     authStore,
     bootstrapAuth,
     isTokenExpired,
+    clearToken,
+    setAuthNotice,
   } from "./stores/auth";
   import Login from "./routes/Login.svelte";
   import Lists from "./routes/Lists.svelte";
@@ -23,7 +26,19 @@
   };
 
   onMount(() => {
+    setUnauthorizedHandler(() => {
+      setAuthNotice("Authentication failed. Please sign in again.");
+      clearToken();
+      if ($location !== "/login") {
+        push("/login");
+      }
+    });
+
     bootstrapAuth();
+
+    return () => {
+      setUnauthorizedHandler(null);
+    };
   });
 
   $: isAuthed =

@@ -31,9 +31,15 @@ export class ApiError extends Error {
 
 type TokenGetter = () => string | null;
 let getToken: TokenGetter = () => null;
+type UnauthorizedHandler = () => void;
+let onUnauthorized: UnauthorizedHandler | null = null;
 
 export const setAuthTokenGetter = (fn: TokenGetter) => {
   getToken = fn;
+};
+
+export const setUnauthorizedHandler = (fn: UnauthorizedHandler | null) => {
+  onUnauthorized = fn;
 };
 
 async function fetchJson<T>(
@@ -69,6 +75,10 @@ async function fetchJson<T>(
   }
 
   if (!res.ok) {
+    if (res.status === 401) {
+      onUnauthorized?.();
+    }
+
     const detail =
       (payload as { detail?: string; message?: string } | null)?.detail ||
       (payload as { detail?: string; message?: string } | null)?.message ||

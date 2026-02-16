@@ -2,11 +2,17 @@
   import { onMount } from "svelte";
   import { push } from "svelte-spa-router";
   import { initGoogleSignIn } from "../lib/auth";
-  import { saveToken } from "../stores/auth";
+  import {
+    authNoticeStore,
+    hydrateAuthNotice,
+    saveToken,
+  } from "../stores/auth";
 
   let error: string | null = null;
 
   onMount(() => {
+    hydrateAuthNotice();
+
     return initGoogleSignIn(
       "google-signin",
       (token) => {
@@ -29,6 +35,9 @@
   </header>
 
   <section class="card stack">
+    {#if $authNoticeStore}
+      <p class="meta">{$authNoticeStore}</p>
+    {/if}
     <div id="google-signin"></div>
     {#if error}
       <p class="meta">{error}</p>

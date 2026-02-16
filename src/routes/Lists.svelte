@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { push } from "svelte-spa-router";
-  import { api, ApiError } from "../lib/api";
+  import { api } from "../lib/api";
+  import { getApiErrorMessage } from "../lib/errors";
   import type { ListOut } from "../lib/types";
   import { clearToken } from "../stores/auth";
 
@@ -21,7 +22,10 @@
     try {
       lists = await api.listLists();
     } catch (err) {
-      error = err instanceof ApiError ? err.detail || err.message : "Load failed.";
+      const message = getApiErrorMessage(err, "Load failed.");
+      if (message) {
+        error = message;
+      }
     } finally {
       loading = false;
     }
@@ -37,7 +41,10 @@
       lists = [created, ...lists];
       newName = "";
     } catch (err) {
-      error = err instanceof ApiError ? err.detail || err.message : "Create failed.";
+      const message = getApiErrorMessage(err, "Create failed.");
+      if (message) {
+        error = message;
+      }
     } finally {
       creating = false;
     }
@@ -52,7 +59,10 @@
       await api.deleteList(listId);
       lists = lists.filter((list) => list.id !== listId);
     } catch (err) {
-      error = err instanceof ApiError ? err.detail || err.message : "Delete failed.";
+      const message = getApiErrorMessage(err, "Delete failed.");
+      if (message) {
+        error = message;
+      }
     } finally {
       deletingId = null;
     }

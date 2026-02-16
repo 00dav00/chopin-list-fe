@@ -4,6 +4,7 @@ import type { UserOut } from "../lib/types";
 
 const TOKEN_KEY = "auth_token";
 const EXPIRY_KEY = "auth_expiry";
+const NOTICE_KEY = "auth_notice";
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 export type AuthState = {
@@ -21,8 +22,36 @@ const initialState: AuthState = {
 };
 
 export const authStore = writable<AuthState>(initialState);
+export const authNoticeStore = writable<string | null>(null);
 
 setAuthTokenGetter(() => get(authStore).token);
+
+export const setAuthNotice = (message: string) => {
+  authNoticeStore.set(message);
+  if (typeof sessionStorage !== "undefined") {
+    sessionStorage.setItem(NOTICE_KEY, message);
+  }
+};
+
+export const clearAuthNotice = () => {
+  authNoticeStore.set(null);
+  if (typeof sessionStorage !== "undefined") {
+    sessionStorage.removeItem(NOTICE_KEY);
+  }
+};
+
+export const hydrateAuthNotice = () => {
+  if (get(authNoticeStore)) {
+    return;
+  }
+  if (typeof sessionStorage === "undefined") {
+    return;
+  }
+  const stored = sessionStorage.getItem(NOTICE_KEY);
+  if (stored) {
+    authNoticeStore.set(stored);
+  }
+};
 
 const readStoredAuth = () => {
   if (typeof localStorage === "undefined") {
@@ -60,6 +89,7 @@ export const isTokenExpired = (expiry: number | null) => {
 export const saveToken = (token: string) => {
   const expiry = Date.now() + WEEK_MS;
   writeStoredAuth(token, expiry);
+  clearAuthNotice();
   authStore.update((state) => ({
     ...state,
     token,

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { push } from "svelte-spa-router";
-  import { api, ApiError } from "../lib/api";
+  import { api } from "../lib/api";
+  import { getApiErrorMessage } from "../lib/errors";
   import type { TemplateDetailOut, TemplateItemOut } from "../lib/types";
   import { clearToken } from "../stores/auth";
 
@@ -62,7 +63,10 @@
       items = sortItems(data.items);
       templateName = data.name;
     } catch (err) {
-      error = err instanceof ApiError ? err.detail || err.message : "Load failed.";
+      const message = getApiErrorMessage(err, "Load failed.");
+      if (message) {
+        error = message;
+      }
     } finally {
       loading = false;
     }
@@ -79,7 +83,10 @@
       template = { ...template, ...updated };
       templateName = updated.name;
     } catch (err) {
-      error = err instanceof ApiError ? err.detail || err.message : "Update failed.";
+      const message = getApiErrorMessage(err, "Update failed.");
+      if (message) {
+        error = message;
+      }
     } finally {
       savingName = false;
     }
@@ -105,7 +112,10 @@
       newItemUnit = "";
       newItemSort = "0";
     } catch (err) {
-      error = err instanceof ApiError ? err.detail || err.message : "Create failed.";
+      const message = getApiErrorMessage(err, "Create failed.");
+      if (message) {
+        error = message;
+      }
     } finally {
       creatingItem = false;
     }
@@ -119,7 +129,10 @@
       await api.deleteTemplateItem(template.id, itemId);
       items = items.filter((item) => item.id !== itemId);
     } catch (err) {
-      error = err instanceof ApiError ? err.detail || err.message : "Delete failed.";
+      const message = getApiErrorMessage(err, "Delete failed.");
+      if (message) {
+        error = message;
+      }
     }
   };
 
@@ -154,7 +167,10 @@
       );
       editingItemId = null;
     } catch (err) {
-      error = err instanceof ApiError ? err.detail || err.message : "Update failed.";
+      const message = getApiErrorMessage(err, "Update failed.");
+      if (message) {
+        error = message;
+      }
     } finally {
       savingItem = false;
     }
@@ -169,7 +185,10 @@
       const created = await api.createListFromTemplate(template.id, payload);
       push(`/lists/${created.id}`);
     } catch (err) {
-      error = err instanceof ApiError ? err.detail || err.message : "Create failed.";
+      const message = getApiErrorMessage(err, "Create failed.");
+      if (message) {
+        error = message;
+      }
     } finally {
       creatingList = false;
     }
