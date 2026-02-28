@@ -16,14 +16,12 @@
 
   let newItemName = "";
   let newItemQty = "";
-  let newItemUnit = "";
   let newItemSort = "0";
   let creatingItem = false;
 
   let editingItemId: string | null = null;
   let editName = "";
   let editQty = "";
-  let editUnit = "";
   let editSort = "0";
   let savingItem = false;
 
@@ -102,14 +100,12 @@
       const payload = {
         name,
         qty: parseOptionalNumber(newItemQty),
-        unit: newItemUnit.trim() || null,
         sort_order: parseSortOrder(newItemSort),
       };
       const created = await api.createTemplateItem(template.id, payload);
       items = sortItems([...items, created]);
       newItemName = "";
       newItemQty = "";
-      newItemUnit = "";
       newItemSort = "0";
     } catch (err) {
       const message = getApiErrorMessage(err, "Create failed.");
@@ -140,7 +136,6 @@
     editingItemId = item.id;
     editName = item.name;
     editQty = item.qty?.toString() ?? "";
-    editUnit = item.unit ?? "";
     editSort = item.sort_order.toString();
   };
 
@@ -158,7 +153,6 @@
       const payload = {
         name,
         qty: parseOptionalNumber(editQty),
-        unit: editUnit.trim() || null,
         sort_order: parseSortOrder(editSort),
       };
       const updated = await api.updateTemplateItem(template.id, itemId, payload);
@@ -252,7 +246,6 @@
         <input class="input" placeholder="Item name" bind:value={newItemName} />
         <div class="flex">
           <input class="input" placeholder="Qty" bind:value={newItemQty} />
-          <input class="input" placeholder="Unit" bind:value={newItemUnit} />
           <input class="input" placeholder="Sort" bind:value={newItemSort} />
           <button class="button" disabled={creatingItem} on:click={createTemplateItem}>
             {creatingItem ? "Adding..." : "Add item"}
@@ -271,7 +264,6 @@
                   <input class="input" bind:value={editName} />
                   <div class="flex">
                     <input class="input" placeholder="Qty" bind:value={editQty} />
-                    <input class="input" placeholder="Unit" bind:value={editUnit} />
                     <input class="input" placeholder="Sort" bind:value={editSort} />
                   </div>
                   <div class="toolbar">
@@ -294,9 +286,6 @@
                     <div class="meta">
                       {#if item.qty !== null && item.qty !== undefined}
                         {item.qty}
-                      {/if}
-                      {#if item.unit}
-                        {" "}{item.unit}
                       {/if}
                       {#if item.sort_order !== undefined && item.sort_order !== null}
                         <span class="pill">Order {item.sort_order}</span>

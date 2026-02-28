@@ -31,7 +31,6 @@ export type ItemOut = {
   list_id: string;
   name: string;
   qty?: number | null;
-  unit?: string | null;
   purchased: boolean;
   purchased_at?: string | null;
   sort_order: number;
@@ -42,14 +41,12 @@ export type ItemOut = {
 export type ItemCreate = {
   name: string;
   qty?: number | null;
-  unit?: string | null;
   sort_order?: number;
 };
 
 export type ItemUpdate = {
   name?: string | null;
   qty?: number | null;
-  unit?: string | null;
   sort_order?: number | null;
   purchased?: boolean | null;
 };
@@ -68,7 +65,6 @@ export type TemplateItemOut = {
   template_id: string;
   name: string;
   qty?: number | null;
-  unit?: string | null;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -81,14 +77,12 @@ export type TemplateDetailOut = TemplateOut & {
 export type TemplateItemCreate = {
   name: string;
   qty?: number | null;
-  unit?: string | null;
   sort_order?: number;
 };
 
 export type TemplateItemUpdate = {
   name?: string | null;
   qty?: number | null;
-  unit?: string | null;
   sort_order?: number | null;
 };
 

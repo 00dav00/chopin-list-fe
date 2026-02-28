@@ -157,7 +157,6 @@ const detailConfigs: DetailConfig[] = [
       expect(apiMock.createItem).toHaveBeenCalledWith(listId, {
         name,
         qty: null,
-        unit: null,
         sort_order: 0,
       });
     },
@@ -175,7 +174,6 @@ const detailConfigs: DetailConfig[] = [
       expect(apiMock.updateItem).toHaveBeenCalledWith(listPrimaryItemId, {
         name,
         qty: null,
-        unit: null,
         sort_order: 1,
       });
     },
@@ -229,7 +227,6 @@ const detailConfigs: DetailConfig[] = [
       expect(apiMock.createTemplateItem).toHaveBeenCalledWith(templateId, {
         name,
         qty: null,
-        unit: null,
         sort_order: 0,
       });
     },
@@ -250,7 +247,6 @@ const detailConfigs: DetailConfig[] = [
         {
           name,
           qty: null,
-          unit: null,
           sort_order: 1,
         }
       );
