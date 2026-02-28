@@ -165,6 +165,15 @@ p {
   margin: 0 0 0.35rem;
 }
 
+.item-summary-checked {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  color: #7a7f86;
+  text-decoration: line-through;
+  font-weight: 500;
+}
+
 .item-checkbox {
   margin-top: 0;
   width: 1rem;
@@ -205,6 +214,38 @@ p {
   display: flex;
   gap: 0.75rem;
   flex-wrap: wrap;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(27, 28, 30, 0.48);
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  z-index: 1000;
+}
+
+.modal {
+  width: min(520px, 100%);
+}
+
+.qty-stepper {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.stepper-button {
+  font-size: 1.1rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.qty-input {
+  text-align: center;
+  min-width: 0;
 }
 
 @media (max-width: 720px) {

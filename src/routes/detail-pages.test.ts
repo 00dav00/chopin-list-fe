@@ -310,8 +310,9 @@ describe.each(detailConfigs)("$name route", (config) => {
 
     render(config.component, { props: config.props });
 
+    await user.click(await screen.findByRole("button", { name: "Add item" }));
     await user.type(await screen.findByPlaceholderText("Item name"), newItemName);
-    await user.click(screen.getByRole("button", { name: "Add item" }));
+    await user.click(screen.getByRole("button", { name: "Create item" }));
 
     await waitFor(() => {
       config.assertCreateCalled(newItemName);

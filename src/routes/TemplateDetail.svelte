@@ -17,6 +17,7 @@
   let newItemName = "";
   let newItemQty = "";
   let creatingItem = false;
+  let addItemModalOpen = false;
 
   let editingItemId: string | null = null;
   let editName = "";
@@ -33,6 +34,13 @@
     if (!trimmed) return null;
     const parsed = Number(trimmed);
     return Number.isNaN(parsed) ? null : parsed;
+  };
+
+  const stepQuantity = (value: string, delta: number) => {
+    const parsed = Number(value.trim());
+    const current = Number.isNaN(parsed) ? 0 : parsed;
+    const next = Math.max(0, current + delta);
+    return Number.isInteger(next) ? next.toString() : `${next}`;
   };
 
   const sortItems = (nextItems: TemplateItemOut[]) =>
@@ -104,6 +112,7 @@
       items = sortItems([...items, created]);
       newItemName = "";
       newItemQty = "";
+      addItemModalOpen = false;
     } catch (err) {
       const message = getApiErrorMessage(err, "Create failed.");
       if (message) {
@@ -112,6 +121,33 @@
     } finally {
       creatingItem = false;
     }
+  };
+
+  const openAddItemModal = () => {
+    newItemName = "";
+    newItemQty = "";
+    addItemModalOpen = true;
+  };
+
+  const closeAddItemModal = () => {
+    if (creatingItem) return;
+    addItemModalOpen = false;
+  };
+
+  const incrementNewItemQty = () => {
+    newItemQty = stepQuantity(newItemQty, 1);
+  };
+
+  const decrementNewItemQty = () => {
+    newItemQty = stepQuantity(newItemQty, -1);
+  };
+
+  const incrementEditQty = () => {
+    editQty = stepQuantity(editQty, 1);
+  };
+
+  const decrementEditQty = () => {
+    editQty = stepQuantity(editQty, -1);
   };
 
   const deleteTemplateItem = async (itemId: string) => {
@@ -232,19 +268,12 @@
     </section>
 
     <section class="card stack">
-      <div>
-        <h2>Template items</h2>
-        <p class="meta">Add the staples you always buy.</p>
-      </div>
-
-      <div class="inline-form">
-        <input class="input" placeholder="Item name" bind:value={newItemName} />
-        <div class="flex">
-          <input class="input" placeholder="Qty" bind:value={newItemQty} />
-          <button class="button" disabled={creatingItem} on:click={createTemplateItem}>
-            {creatingItem ? "Adding..." : "Add item"}
-          </button>
+      <div class="row">
+        <div>
+          <h2>Template items</h2>
+          <p class="meta">Add the staples you always buy.</p>
         </div>
+        <button class="button" on:click={openAddItemModal}>Add item</button>
       </div>
 
       {#if items.length === 0}
@@ -256,8 +285,31 @@
               {#if editingItemId === item.id}
                 <div class="inline-form">
                   <input class="input" bind:value={editName} />
-                  <div class="flex">
-                    <input class="input" placeholder="Qty" bind:value={editQty} />
+                  <div class="qty-stepper">
+                    <button
+                      class="button ghost icon-button stepper-button"
+                      type="button"
+                      aria-label="Decrease quantity"
+                      on:click={decrementEditQty}
+                    >
+                      -
+                    </button>
+                    <input
+                      class="input qty-input"
+                      type="number"
+                      min="0"
+                      step="1"
+                      placeholder="Qty"
+                      bind:value={editQty}
+                    />
+                    <button
+                      class="button ghost icon-button stepper-button"
+                      type="button"
+                      aria-label="Increase quantity"
+                      on:click={incrementEditQty}
+                    >
+                      +
+                    </button>
                   </div>
                   <div class="toolbar">
                     <button
@@ -334,3 +386,53 @@
     </section>
   {/if}
 </main>
+
+{#if addItemModalOpen}
+  <div class="modal-backdrop" role="presentation" on:click|self={closeAddItemModal}>
+    <section
+      class="modal card stack"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="add-template-item-title"
+    >
+      <h3 id="add-template-item-title">Add item</h3>
+      <div class="inline-form">
+        <input class="input" placeholder="Item name" bind:value={newItemName} />
+        <div class="qty-stepper">
+          <button
+            class="button ghost icon-button stepper-button"
+            type="button"
+            aria-label="Decrease quantity"
+            on:click={decrementNewItemQty}
+          >
+            -
+          </button>
+          <input
+            class="input qty-input"
+            type="number"
+            min="0"
+            step="1"
+            placeholder="Qty"
+            bind:value={newItemQty}
+          />
+          <button
+            class="button ghost icon-button stepper-button"
+            type="button"
+            aria-label="Increase quantity"
+            on:click={incrementNewItemQty}
+          >
+            +
+          </button>
+        </div>
+      </div>
+      <div class="toolbar">
+        <button class="button ghost" disabled={creatingItem} on:click={closeAddItemModal}>
+          Cancel
+        </button>
+        <button class="button" disabled={creatingItem} on:click={createTemplateItem}>
+          {creatingItem ? "Creating..." : "Create item"}
+        </button>
+      </div>
+    </section>
+  </div>
+{/if}
