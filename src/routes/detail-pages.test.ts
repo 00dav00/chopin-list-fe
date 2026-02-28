@@ -400,12 +400,22 @@ describe("ListDetail route specific behavior", () => {
 
     render(ListDetail, { props: { params: { listId } } });
 
-    await user.click((await screen.findAllByRole("button", { name: "Mark bought" }))[0]);
+    const checkbox = (await screen.findByRole("checkbox", {
+      name: "Purchased Apples",
+    })) as HTMLInputElement;
+    expect(checkbox.checked).toBe(false);
+    await user.click(checkbox);
 
     await waitFor(() => {
       expect(apiMock.toggleItem).toHaveBeenCalledWith(listPrimaryItemId);
     });
-    expect(await screen.findByRole("button", { name: "Unmark" })).toBeTruthy();
+    await waitFor(() => {
+      expect(
+        (screen.getByRole("checkbox", {
+          name: "Purchased Apples",
+        }) as HTMLInputElement).checked
+      ).toBe(true);
+    });
   });
 });
 
