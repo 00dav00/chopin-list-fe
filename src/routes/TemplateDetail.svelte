@@ -16,13 +16,11 @@
 
   let newItemName = "";
   let newItemQty = "";
-  let newItemSort = "0";
   let creatingItem = false;
 
   let editingItemId: string | null = null;
   let editName = "";
   let editQty = "";
-  let editSort = "0";
   let savingItem = false;
 
   let createListName = "";
@@ -37,11 +35,6 @@
     return Number.isNaN(parsed) ? null : parsed;
   };
 
-  const parseSortOrder = (value: string) => {
-    const parsed = Number.parseInt(value, 10);
-    return Number.isNaN(parsed) ? 0 : parsed;
-  };
-
   const sortItems = (nextItems: TemplateItemOut[]) =>
     [...nextItems].sort((a, b) => {
       if (a.sort_order !== b.sort_order) {
@@ -51,6 +44,11 @@
         new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       );
     });
+
+  const nextSortOrder = (currentItems: TemplateItemOut[]) =>
+    currentItems.reduce((maxSortOrder, item) => {
+      return item.sort_order > maxSortOrder ? item.sort_order : maxSortOrder;
+    }, 0) + 1;
 
   const loadTemplate = async (templateId: string) => {
     loading = true;
@@ -100,13 +98,12 @@
       const payload = {
         name,
         qty: parseOptionalNumber(newItemQty),
-        sort_order: parseSortOrder(newItemSort),
+        sort_order: nextSortOrder(items),
       };
       const created = await api.createTemplateItem(template.id, payload);
       items = sortItems([...items, created]);
       newItemName = "";
       newItemQty = "";
-      newItemSort = "0";
     } catch (err) {
       const message = getApiErrorMessage(err, "Create failed.");
       if (message) {
@@ -136,7 +133,6 @@
     editingItemId = item.id;
     editName = item.name;
     editQty = item.qty?.toString() ?? "";
-    editSort = item.sort_order.toString();
   };
 
   const cancelEditItem = () => {
@@ -153,7 +149,6 @@
       const payload = {
         name,
         qty: parseOptionalNumber(editQty),
-        sort_order: parseSortOrder(editSort),
       };
       const updated = await api.updateTemplateItem(template.id, itemId, payload);
       items = sortItems(
@@ -246,7 +241,6 @@
         <input class="input" placeholder="Item name" bind:value={newItemName} />
         <div class="flex">
           <input class="input" placeholder="Qty" bind:value={newItemQty} />
-          <input class="input" placeholder="Sort" bind:value={newItemSort} />
           <button class="button" disabled={creatingItem} on:click={createTemplateItem}>
             {creatingItem ? "Adding..." : "Add item"}
           </button>
@@ -264,7 +258,6 @@
                   <input class="input" bind:value={editName} />
                   <div class="flex">
                     <input class="input" placeholder="Qty" bind:value={editQty} />
-                    <input class="input" placeholder="Sort" bind:value={editSort} />
                   </div>
                   <div class="toolbar">
                     <button
