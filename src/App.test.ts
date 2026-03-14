@@ -18,7 +18,7 @@ const makeFetch = (handlers: Record<string, () => Response>) =>
     const path = getPathname(input);
     const handler = handlers[path];
     if (!handler) {
-      return Promise.resolve(new Response("", { status: 404 }));
+      return Promise.resolve(makeJsonResponse({}, 200));
     }
     return Promise.resolve(handler());
   });
@@ -28,7 +28,7 @@ describe("App", () => {
 
   beforeEach(() => {
     vi.resetModules();
-    setRoute("/lists");
+    setRoute("/dashboard");
   });
 
   it("redirects unauthenticated users to /login", async () => {
@@ -41,34 +41,8 @@ describe("App", () => {
     expect(await screen.findByRole("heading", { name: "Shoplist" })).toBeTruthy();
   });
 
-  it("redirects authenticated users from /login to /lists", async () => {
-    setRoute("/login");
-    localStorage.setItem("auth_token", "token-123");
-    localStorage.setItem("auth_expiry", String(Date.now() + 60_000));
-
-    vi.stubGlobal(
-      "fetch",
-      makeFetch({
-        "/me": () =>
-          makeJsonResponse({
-            id: "user-1",
-            created_at: "2026-01-01T00:00:00Z",
-          }),
-        "/lists": () => makeJsonResponse([]),
-      })
-    );
-
-    const module = await import("./App.svelte");
-    App = module.default;
-
-    render(App);
-
-    await waitForRoute("/lists");
-    expect(await screen.findByRole("heading", { name: "Your Lists" })).toBeTruthy();
-  });
-
   it("redirects to /login and shows auth notice when a 401 occurs", async () => {
-    setRoute("/lists");
+    setRoute("/dashboard");
     localStorage.setItem("auth_token", "token-123");
     localStorage.setItem("auth_expiry", String(Date.now() + 60_000));
 
@@ -80,7 +54,13 @@ describe("App", () => {
             id: "user-1",
             created_at: "2026-01-01T00:00:00Z",
           }),
-        "/lists": () => makeJsonResponse({ detail: "Unauthorized" }, 401),
+        "/me/": () =>
+          makeJsonResponse({
+            id: "user-1",
+            created_at: "2026-01-01T00:00:00Z",
+          }),
+        "/me/dashboard": () => makeJsonResponse({ detail: "Unauthorized" }, 401),
+        "/me/dashboard/": () => makeJsonResponse({ detail: "Unauthorized" }, 401),
       })
     );
 

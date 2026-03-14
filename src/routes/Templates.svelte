@@ -84,6 +84,9 @@
       <p>Reuse your favorite set of items.</p>
     </div>
     <div class="nav-links">
+      <button class="button ghost" on:click={() => push("/dashboard")}>
+        Dashboard
+      </button>
       <button class="button ghost" on:click={() => push("/lists")}>Lists</button>
       <button class="button secondary" on:click={logout}>Sign out</button>
     </div>

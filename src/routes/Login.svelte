@@ -17,7 +17,7 @@
       "google-signin",
       (token) => {
         saveToken(token);
-        push("/lists");
+        push("/dashboard");
       },
       (message) => {
         error = message;

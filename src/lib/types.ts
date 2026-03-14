@@ -98,3 +98,16 @@ export type TemplateUpdate = {
 export type CreateListFromTemplate = {
   name?: string | null;
 };
+
+export type DashboardTemplateOut = {
+  id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DashboardOut = {
+  list_count: number;
+  templates_count: number;
+  last_created_templates: DashboardTemplateOut[];
+};

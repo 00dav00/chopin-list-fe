@@ -42,7 +42,7 @@ describe("Login route", () => {
     );
   });
 
-  it("saves token and routes to /lists on Google success", async () => {
+  it("saves token and routes to /dashboard on Google success", async () => {
     initGoogleSignInMock.mockImplementation(
       (_elementId: string, onSuccess: (token: string) => void) => {
         onSuccess("jwt-token");
@@ -58,7 +58,7 @@ describe("Login route", () => {
     await waitFor(() => {
       expect(localStorage.getItem("auth_token")).toBe("jwt-token");
     });
-    expect(pushMock).toHaveBeenCalledWith("/lists");
+    expect(pushMock).toHaveBeenCalledWith("/dashboard");
   });
 
   it("shows login error when Google sign-in initialization fails", async () => {

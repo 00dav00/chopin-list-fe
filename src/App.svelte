@@ -9,15 +9,18 @@
     clearToken,
     setAuthNotice,
   } from "./stores/auth";
-  import Login from "./routes/Login.svelte";
-  import Lists from "./routes/Lists.svelte";
+import Login from "./routes/Login.svelte";
+import Dashboard from "./routes/Dashboard.svelte";
+import Lists from "./routes/Lists.svelte";
   import ListDetail from "./routes/ListDetail.svelte";
   import Templates from "./routes/Templates.svelte";
   import TemplateDetail from "./routes/TemplateDetail.svelte";
   import NotFound from "./routes/NotFound.svelte";
 
   const routes = {
+    "/": Dashboard,
     "/login": Login,
+    "/dashboard": Dashboard,
     "/lists": Lists,
     "/lists/:listId": ListDetail,
     "/templates": Templates,
@@ -49,7 +52,7 @@
       push("/login");
     }
     if (isAuthed && $location === "/login") {
-      push("/lists");
+      push("/dashboard");
     }
   }
 </script>

@@ -355,6 +355,9 @@
       <p>Manage items and keep things in sync.</p>
     </div>
     <div class="nav-links">
+      <button class="button ghost" on:click={() => push("/dashboard")}>
+        Dashboard
+      </button>
       <button class="button ghost" on:click={() => push("/lists")}>All lists</button>
       <button class="button ghost" on:click={() => push("/templates")}>
         Templates
