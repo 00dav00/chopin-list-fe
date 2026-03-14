@@ -187,6 +187,25 @@ p {
   font-weight: 500;
 }
 
+.item-qty-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.35rem;
+}
+
+.qty-inline-button {
+  width: 1.8rem;
+  height: 1.8rem;
+  font-size: 1rem;
+}
+
+.qty-inline-value {
+  color: var(--muted);
+  font-size: 0.88rem;
+  min-width: 3.9rem;
+}
+
 .item-checkbox {
   margin-top: 0;
   width: 1rem;

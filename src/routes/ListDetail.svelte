@@ -23,6 +23,7 @@
   let editName = "";
   let editQty = "";
   let savingItem = false;
+  let updatingQtyItemId: string | null = null;
   let reorderingItems = false;
   let draggedItemId: string | null = null;
   let dragOverItemId: string | null = null;
@@ -273,6 +274,33 @@
     }
   };
 
+  const adjustItemQty = async (item: ItemOut, delta: number) => {
+    if (updatingQtyItemId || editingItemId === item.id) return;
+
+    const currentQty = item.qty ?? 0;
+    const nextQty = Math.max(0, currentQty + delta);
+    if (nextQty === currentQty) return;
+
+    updatingQtyItemId = item.id;
+    error = null;
+    try {
+      const updated = await api.updateItem(item.id, {
+        name: item.name,
+        qty: nextQty,
+      });
+      items = sortItems(
+        items.map((entry) => (entry.id === item.id ? updated : entry))
+      );
+    } catch (err) {
+      const message = getApiErrorMessage(err, "Update failed.");
+      if (message) {
+        error = message;
+      }
+    } finally {
+      updatingQtyItemId = null;
+    }
+  };
+
   const startEditItem = (item: ItemOut) => {
     editingItemId = item.id;
     editName = item.name;
@@ -437,18 +465,31 @@
                       {#if item.purchased}
                         <div class="item-summary-checked">
                           <span>{item.name}</span>
-                          {#if item.qty !== null && item.qty !== undefined}
-                            <span>(x {item.qty})</span>
-                          {/if}
                         </div>
                       {:else}
                         <h3>{item.name}</h3>
-                        <div class="meta">
-                          {#if item.qty !== null && item.qty !== undefined}
-                            (x {item.qty})
-                          {/if}
-                        </div>
                       {/if}
+                      <div class="item-qty-controls">
+                        <button
+                          class="button ghost icon-button qty-inline-button"
+                          type="button"
+                          aria-label={`Decrease quantity for ${item.name}`}
+                          disabled={updatingQtyItemId === item.id}
+                          on:click={() => adjustItemQty(item, -1)}
+                        >
+                          -
+                        </button>
+                        <span class="qty-inline-value">Qty {item.qty ?? 0}</span>
+                        <button
+                          class="button ghost icon-button qty-inline-button"
+                          type="button"
+                          aria-label={`Increase quantity for ${item.name}`}
+                          disabled={updatingQtyItemId === item.id}
+                          on:click={() => adjustItemQty(item, 1)}
+                        >
+                          +
+                        </button>
+                      </div>
                     </div>
                   </div>
                   <div class="toolbar">
