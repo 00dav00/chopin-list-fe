@@ -166,6 +166,11 @@ p {
   color: var(--ink);
 }
 
+.dashboard-link-card {
+  color: inherit;
+  text-decoration: none;
+}
+
 .item-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

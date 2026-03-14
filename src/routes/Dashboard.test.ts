@@ -49,6 +49,12 @@ describe("Dashboard route", () => {
 
     expect(await screen.findByText("3")).toBeTruthy();
     expect(await screen.findByText("7")).toBeTruthy();
+    expect((await screen.findByRole("link", { name: "Open lists" })).getAttribute("href")).toBe(
+      "#/lists"
+    );
+    expect(
+      (await screen.findByRole("link", { name: "Open templates" })).getAttribute("href")
+    ).toBe("#/templates");
     expect(await screen.findByText("Weekly groceries")).toBeTruthy();
     expect(await screen.findByText("Weekly basics")).toBeTruthy();
   });

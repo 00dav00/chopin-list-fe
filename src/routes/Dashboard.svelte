@@ -96,15 +96,19 @@
     <p class="meta">{error}</p>
   {:else if summary}
     <section class="dashboard-grid">
-      <article class="card stack">
+      <a class="card stack dashboard-link-card" href="#/lists" aria-label="Open lists">
         <h2>Lists</h2>
         <p class="dashboard-value">{summary.list_count}</p>
-      </article>
+      </a>
 
-      <article class="card stack">
+      <a
+        class="card stack dashboard-link-card"
+        href="#/templates"
+        aria-label="Open templates"
+      >
         <h2>Templates</h2>
         <p class="dashboard-value">{summary.templates_count}</p>
-      </article>
+      </a>
     </section>
 
     <section class="card stack">
