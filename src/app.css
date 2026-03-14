@@ -154,6 +154,19 @@ p {
   align-items: center;
 }
 
+.draggable-item {
+  cursor: grab;
+}
+
+.draggable-item:active {
+  cursor: grabbing;
+}
+
+.draggable-item.drag-over {
+  border-color: var(--accent);
+  background: #f3f8f6;
+}
+
 .item-main {
   display: flex;
   align-items: center;
@@ -249,6 +262,10 @@ p {
 }
 
 @media (max-width: 720px) {
+  body {
+    font-size: 0.95rem;
+  }
+
   .row {
     grid-template-columns: 1fr;
   }
