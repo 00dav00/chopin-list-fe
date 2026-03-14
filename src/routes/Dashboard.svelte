@@ -139,20 +139,18 @@
       </section>
     {/if}
 
-    <section class="card stack">
-      <div class="row">
-        <div>
-          <h2>Latest templates</h2>
-          <p class="meta">Your five most recently created templates.</p>
+    {#if summary.last_created_templates.length > 0}
+      <section class="card stack">
+        <div class="row">
+          <div>
+            <h2>Latest templates</h2>
+            <p class="meta">Your five most recently created templates.</p>
+          </div>
+          <button class="button ghost" on:click={() => push("/templates")}>
+            Open templates
+          </button>
         </div>
-        <button class="button ghost" on:click={() => push("/templates")}>
-          Open templates
-        </button>
-      </div>
 
-      {#if summary.last_created_templates.length === 0}
-        <p class="meta">No templates yet.</p>
-      {:else}
         <div class="list-grid">
           {#each summary.last_created_templates as template}
             <article class="card item-row">
@@ -166,7 +164,7 @@
             </article>
           {/each}
         </div>
-      {/if}
-    </section>
+      </section>
+    {/if}
   {/if}
 </main>
