@@ -110,11 +110,10 @@
     </section>
 
     {#if summary.last_created_lists.length > 0}
-      <section class="card stack dashboard-section-card">
+      <section class="card stack">
         <div class="row">
           <div>
             <h2>Latest lists</h2>
-            <p class="meta">Your five most recently created lists.</p>
           </div>
         </div>
 
@@ -132,11 +131,10 @@
     {/if}
 
     {#if summary.last_created_templates.length > 0}
-      <section class="card stack dashboard-section-card">
+      <section class="card stack">
         <div class="row">
           <div>
             <h2>Latest templates</h2>
-            <p class="meta">Your five most recently created templates.</p>
           </div>
         </div>
 
