@@ -15,7 +15,7 @@
   let savingName = false;
 
   let newItemName = "";
-  let newItemQty = "";
+  let newItemQty = "1";
   let creatingItem = false;
   let addItemModalOpen = false;
 
@@ -111,7 +111,7 @@
       const created = await api.createTemplateItem(template.id, payload);
       items = sortItems([...items, created]);
       newItemName = "";
-      newItemQty = "";
+      newItemQty = "1";
       addItemModalOpen = false;
     } catch (err) {
       const message = getApiErrorMessage(err, "Create failed.");
@@ -125,7 +125,7 @@
 
   const openAddItemModal = () => {
     newItemName = "";
-    newItemQty = "";
+    newItemQty = "1";
     addItemModalOpen = true;
   };
 

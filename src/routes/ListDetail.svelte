@@ -15,7 +15,7 @@
   let savingName = false;
 
   let newItemName = "";
-  let newItemQty = "";
+  let newItemQty = "1";
   let creatingItem = false;
   let addItemModalOpen = false;
 
@@ -23,6 +23,9 @@
   let editName = "";
   let editQty = "";
   let savingItem = false;
+  let reorderingItems = false;
+  let draggedItemId: string | null = null;
+  let dragOverItemId: string | null = null;
 
   let currentListId = "";
 
@@ -54,6 +57,28 @@
     currentItems.reduce((maxSortOrder, item) => {
       return item.sort_order > maxSortOrder ? item.sort_order : maxSortOrder;
     }, 0) + 1;
+
+  const moveItem = (
+    currentItems: ItemOut[],
+    sourceItemId: string,
+    targetItemId: string
+  ) => {
+    const sourceIndex = currentItems.findIndex((item) => item.id === sourceItemId);
+    const targetIndex = currentItems.findIndex((item) => item.id === targetItemId);
+
+    if (
+      sourceIndex < 0 ||
+      targetIndex < 0 ||
+      sourceIndex === targetIndex
+    ) {
+      return currentItems;
+    }
+
+    const reordered = [...currentItems];
+    const [moved] = reordered.splice(sourceIndex, 1);
+    reordered.splice(targetIndex, 0, moved);
+    return reordered;
+  };
 
   const loadList = async (listId: string) => {
     loading = true;
@@ -110,7 +135,7 @@
       const created = await api.createItem(list.id, payload);
       items = sortItems([...items, created]);
       newItemName = "";
-      newItemQty = "";
+      newItemQty = "1";
       addItemModalOpen = false;
     } catch (err) {
       const message = getApiErrorMessage(err, "Create failed.");
@@ -124,7 +149,7 @@
 
   const openAddItemModal = () => {
     newItemName = "";
-    newItemQty = "";
+    newItemQty = "1";
     addItemModalOpen = true;
   };
 
@@ -147,6 +172,76 @@
 
   const decrementEditQty = () => {
     editQty = stepQuantity(editQty, -1);
+  };
+
+  const clearDragState = () => {
+    draggedItemId = null;
+    dragOverItemId = null;
+  };
+
+  const handleDragStart = (event: DragEvent, itemId: string) => {
+    if (editingItemId || reorderingItems) {
+      event.preventDefault();
+      return;
+    }
+
+    draggedItemId = itemId;
+    event.dataTransfer?.setData("text/plain", itemId);
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = "move";
+    }
+  };
+
+  const handleDragOver = (event: DragEvent, targetItemId: string) => {
+    if (!draggedItemId || draggedItemId === targetItemId || reorderingItems) return;
+    event.preventDefault();
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = "move";
+    }
+    dragOverItemId = targetItemId;
+  };
+
+  const handleDrop = async (event: DragEvent, targetItemId: string) => {
+    event.preventDefault();
+    if (!list || reorderingItems) {
+      clearDragState();
+      return;
+    }
+
+    const sourceItemId =
+      draggedItemId || event.dataTransfer?.getData("text/plain") || null;
+    if (!sourceItemId || sourceItemId === targetItemId) {
+      clearDragState();
+      return;
+    }
+
+    const previousItems = items;
+    const reordered = moveItem(previousItems, sourceItemId, targetItemId);
+    if (reordered === previousItems) {
+      clearDragState();
+      return;
+    }
+
+    items = reordered;
+    reorderingItems = true;
+    error = null;
+    clearDragState();
+
+    try {
+      const updated = await api.reorderListItems(
+        list.id,
+        reordered.map((item) => item.id)
+      );
+      items = sortItems(updated);
+    } catch (err) {
+      items = previousItems;
+      const message = getApiErrorMessage(err, "Reorder failed.");
+      if (message) {
+        error = message;
+      }
+    } finally {
+      reorderingItems = false;
+    }
   };
 
   const toggleItem = async (itemId: string) => {
@@ -276,7 +371,17 @@
       {:else}
         <div class="stack">
           {#each items as item}
-            <div class="card">
+            <div
+              class="card draggable-item"
+              class:drag-over={dragOverItemId === item.id}
+              draggable={editingItemId !== item.id && !reorderingItems}
+              role="listitem"
+              aria-grabbed={draggedItemId === item.id}
+              on:dragstart={(event) => handleDragStart(event, item.id)}
+              on:dragover={(event) => handleDragOver(event, item.id)}
+              on:drop={(event) => handleDrop(event, item.id)}
+              on:dragend={clearDragState}
+            >
               {#if editingItemId === item.id}
                 <div class="inline-form">
                   <input class="input" bind:value={editName} />
