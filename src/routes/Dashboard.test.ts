@@ -56,6 +56,7 @@ describe("Dashboard route", () => {
       (await screen.findByRole("link", { name: "Open templates" })).getAttribute("href")
     ).toBe("#/templates");
     expect(screen.queryByRole("button", { name: "Open lists" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Open templates" })).toBeNull();
     expect(await screen.findByText("Weekly groceries")).toBeTruthy();
     expect(await screen.findByText("Weekly basics")).toBeTruthy();
   });

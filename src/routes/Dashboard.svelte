@@ -143,9 +143,6 @@
             <h2>Latest templates</h2>
             <p class="meta">Your five most recently created templates.</p>
           </div>
-          <button class="button ghost" on:click={() => push("/templates")}>
-            Open templates
-          </button>
         </div>
 
         <div class="list-grid">
