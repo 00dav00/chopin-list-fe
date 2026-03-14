@@ -253,6 +253,23 @@
     <p class="meta">Template not found.</p>
   {:else}
     <section class="card stack">
+      <div>
+        <h2>Create list from template</h2>
+        <p class="meta">Spin up a list with these items in one tap.</p>
+      </div>
+      <div class="toolbar">
+        <input
+          class="input"
+          placeholder="Optional list name"
+          bind:value={createListName}
+        />
+        <button class="button" disabled={creatingList} on:click={createListFromTemplate}>
+          {creatingList ? "Creating..." : "Create list"}
+        </button>
+      </div>
+    </section>
+
+    <section class="card stack">
       <div class="row">
         <div>
           <h2>Template details</h2>
@@ -368,22 +385,6 @@
       {/if}
     </section>
 
-    <section class="card stack">
-      <div>
-        <h2>Create list from template</h2>
-        <p class="meta">Spin up a list with these items in one tap.</p>
-      </div>
-      <div class="toolbar">
-        <input
-          class="input"
-          placeholder="Optional list name"
-          bind:value={createListName}
-        />
-        <button class="button" disabled={creatingList} on:click={createListFromTemplate}>
-          {creatingList ? "Creating..." : "Create list"}
-        </button>
-      </div>
-    </section>
   {/if}
 </main>
 
