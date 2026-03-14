@@ -118,9 +118,6 @@
             <h2>Latest lists</h2>
             <p class="meta">Your five most recently created lists.</p>
           </div>
-          <button class="button ghost" on:click={() => push("/lists")}>
-            Open lists
-          </button>
         </div>
 
         <div class="list-grid">
