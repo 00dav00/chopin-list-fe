@@ -27,6 +27,7 @@ describe("Dashboard route", () => {
               {
                 id: "list-1",
                 name: "Weekly groceries",
+                items_count: 5,
                 created_at: "2026-01-02T00:00:00Z",
                 updated_at: "2026-01-02T00:00:00Z",
               },
@@ -35,6 +36,7 @@ describe("Dashboard route", () => {
               {
                 id: "template-1",
                 name: "Weekly basics",
+                items_count: 1,
                 created_at: "2026-01-01T00:00:00Z",
                 updated_at: "2026-01-01T00:00:00Z",
               },
@@ -47,6 +49,10 @@ describe("Dashboard route", () => {
 
     render(Dashboard);
 
+    expect(await screen.findByRole("heading", { name: "Chopin list" })).toBeTruthy();
+    expect(screen.queryByText("Quick overview of your lists and templates.")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Lists" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Templates" })).toBeNull();
     expect(await screen.findByText("3")).toBeTruthy();
     expect(await screen.findByText("7")).toBeTruthy();
     expect((await screen.findByRole("link", { name: "Open lists" })).getAttribute("href")).toBe(
@@ -57,12 +63,14 @@ describe("Dashboard route", () => {
     ).toBe("#/templates");
     expect(screen.queryByRole("button", { name: "Open lists" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Open templates" })).toBeNull();
-    expect((await screen.findByText("Weekly groceries")).closest("a")?.getAttribute("href")).toBe(
+    expect((await screen.findByText(/Weekly groceries/)).closest("a")?.getAttribute("href")).toBe(
       "#/lists/list-1"
     );
-    expect((await screen.findByText("Weekly basics")).closest("a")?.getAttribute("href")).toBe(
+    expect(await screen.findByText(/Weekly groceries \(5 items\)/)).toBeTruthy();
+    expect((await screen.findByText(/Weekly basics/)).closest("a")?.getAttribute("href")).toBe(
       "#/templates/template-1"
     );
+    expect(await screen.findByText(/Weekly basics \(1 item\)/)).toBeTruthy();
   });
 
   it("shows api detail message when dashboard request fails", async () => {
@@ -95,6 +103,7 @@ describe("Dashboard route", () => {
               {
                 id: "template-1",
                 name: "Weekly basics",
+                items_count: 0,
                 created_at: "2026-01-01T00:00:00Z",
                 updated_at: "2026-01-01T00:00:00Z",
               },
@@ -123,6 +132,7 @@ describe("Dashboard route", () => {
               {
                 id: "list-1",
                 name: "Weekly groceries",
+                items_count: 0,
                 created_at: "2026-01-02T00:00:00Z",
                 updated_at: "2026-01-02T00:00:00Z",
               },

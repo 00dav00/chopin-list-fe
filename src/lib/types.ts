@@ -102,6 +102,7 @@ export type CreateListFromTemplate = {
 export type DashboardTemplateOut = {
   id: string;
   name: string;
+  items_count: number;
   created_at: string;
   updated_at: string;
 };
@@ -109,6 +110,7 @@ export type DashboardTemplateOut = {
 export type DashboardListOut = {
   id: string;
   name: string;
+  items_count: number;
   created_at: string;
   updated_at: string;
 };

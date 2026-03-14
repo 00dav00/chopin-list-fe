@@ -72,20 +72,18 @@
   const formatDate = (value: string) =>
     new Date(value).toLocaleDateString();
 
+  const formatItemsCount = (count: number) =>
+    `(${count} ${count === 1 ? "item" : "items"})`;
+
   onMount(loadDashboard);
 </script>
 
 <main>
   <header class="page-header">
     <div>
-      <h1>Dashboard</h1>
-      <p>Quick overview of your lists and templates.</p>
+      <h1>Chopin list</h1>
     </div>
     <div class="nav-links">
-      <button class="button ghost" on:click={() => push("/lists")}>Lists</button>
-      <button class="button ghost" on:click={() => push("/templates")}>
-        Templates
-      </button>
       <button class="button secondary" on:click={logout}>Sign out</button>
     </div>
   </header>
@@ -112,7 +110,7 @@
     </section>
 
     {#if summary.last_created_lists.length > 0}
-      <section class="card stack">
+      <section class="card stack dashboard-section-card">
         <div class="row">
           <div>
             <h2>Latest lists</h2>
@@ -123,8 +121,10 @@
         <div class="list-grid">
           {#each summary.last_created_lists as list}
             <a class="card dashboard-recent-link" href={`#/lists/${list.id}`}>
-              <h3>{list.name}</h3>
-              <p class="meta">Created {formatDate(list.created_at)}</p>
+              <div class="dashboard-recent-main">
+                <h3>{list.name} {formatItemsCount(list.items_count)}</h3>
+                <p class="meta">Created {formatDate(list.created_at)}</p>
+              </div>
             </a>
           {/each}
         </div>
@@ -132,7 +132,7 @@
     {/if}
 
     {#if summary.last_created_templates.length > 0}
-      <section class="card stack">
+      <section class="card stack dashboard-section-card">
         <div class="row">
           <div>
             <h2>Latest templates</h2>
@@ -143,8 +143,10 @@
         <div class="list-grid">
           {#each summary.last_created_templates as template}
             <a class="card dashboard-recent-link" href={`#/templates/${template.id}`}>
-              <h3>{template.name}</h3>
-              <p class="meta">Created {formatDate(template.created_at)}</p>
+              <div class="dashboard-recent-main">
+                <h3>{template.name} {formatItemsCount(template.items_count)}</h3>
+                <p class="meta">Created {formatDate(template.created_at)}</p>
+              </div>
             </a>
           {/each}
         </div>
