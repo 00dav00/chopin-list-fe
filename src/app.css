@@ -102,6 +102,11 @@ p {
   cursor: pointer;
 }
 
+.button-large {
+  padding: 0.85rem 1.4rem;
+  font-size: 1rem;
+}
+
 .button.secondary {
   background: transparent;
   color: var(--accent);

@@ -97,7 +97,7 @@
         placeholder="New list name"
         bind:value={newName}
       />
-      <button class="button" disabled={creating} on:click={createList}>
+      <button class="button button-large" disabled={creating} on:click={createList}>
         {creating ? "Creating..." : "Create list"}
       </button>
     </div>
