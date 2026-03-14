@@ -75,4 +75,33 @@ describe("Dashboard route", () => {
 
     expect(await screen.findByText("Dashboard unavailable")).toBeTruthy();
   });
+
+  it("does not render latest lists section when there are none", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            list_count: 0,
+            templates_count: 1,
+            last_created_lists: [],
+            last_created_templates: [
+              {
+                id: "template-1",
+                name: "Weekly basics",
+                created_at: "2026-01-01T00:00:00Z",
+                updated_at: "2026-01-01T00:00:00Z",
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      )
+    );
+
+    render(Dashboard);
+
+    expect(screen.queryByRole("heading", { name: "Latest lists" })).toBeNull();
+    expect(await screen.findByRole("heading", { name: "Latest templates" })).toBeTruthy();
+  });
 });
