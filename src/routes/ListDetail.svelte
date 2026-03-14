@@ -363,7 +363,6 @@
           <h2>Items</h2>
           <p class="meta">Add, edit, or tick items as you shop.</p>
         </div>
-        <button class="button" on:click={openAddItemModal}>Add item</button>
       </div>
 
       {#if items.length === 0}
@@ -485,6 +484,10 @@
         </div>
       {/if}
     </section>
+
+    <button class="button floating-add-item" on:click={openAddItemModal}>
+      Add item
+    </button>
   {/if}
 </main>
 
