@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/svelte";
+import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ListDetail from "./ListDetail.svelte";
@@ -22,6 +22,7 @@ const { pushMock, apiMock, TestApiError } = vi.hoisted(() => ({
     updateItem: vi.fn(),
     toggleItem: vi.fn(),
     deleteItem: vi.fn(),
+    reorderListItems: vi.fn(),
     getTemplate: vi.fn(),
     updateTemplate: vi.fn(),
     createTemplateItem: vi.fn(),
@@ -156,7 +157,7 @@ const detailConfigs: DetailConfig[] = [
     assertCreateCalled: (name) => {
       expect(apiMock.createItem).toHaveBeenCalledWith(listId, {
         name,
-        qty: null,
+        qty: 1,
         sort_order: 3,
       });
     },
@@ -225,7 +226,7 @@ const detailConfigs: DetailConfig[] = [
     assertCreateCalled: (name) => {
       expect(apiMock.createTemplateItem).toHaveBeenCalledWith(templateId, {
         name,
-        qty: null,
+        qty: 1,
         sort_order: 3,
       });
     },
@@ -291,7 +292,9 @@ describe.each(detailConfigs)("$name route", (config) => {
     render(config.component, { props: config.props });
 
     await screen.findByText(config.itemNameForEdit);
-    const [nameInput] = screen.getAllByRole("textbox");
+    const nameInput = await screen.findByDisplayValue(
+      config.name === "ListDetail" ? listBase.name : templateBase.name
+    );
     await user.clear(nameInput);
     await user.type(nameInput, renamed);
     await user.click(screen.getByRole("button", { name: "Save name" }));
@@ -416,6 +419,50 @@ describe("ListDetail route specific behavior", () => {
           name: "Purchased Apples",
         }) as HTMLInputElement).checked
       ).toBe(true);
+    });
+  });
+
+  it("reorders items and persists the new order", async () => {
+    apiMock.getList.mockResolvedValue(listBase);
+    apiMock.listItems.mockResolvedValue(listItemsUnsorted);
+    apiMock.reorderListItems.mockResolvedValue([
+      makeItem({
+        id: "list-item-2",
+        list_id: listId,
+        name: "Bananas",
+        sort_order: 0,
+      }),
+      makeItem({
+        id: listPrimaryItemId,
+        list_id: listId,
+        name: "Apples",
+        sort_order: 1,
+      }),
+    ]);
+
+    render(ListDetail, { props: { params: { listId } } });
+
+    await screen.findByText("Apples");
+    const applesCard = screen
+      .getByRole("heading", { level: 3, name: "Apples" })
+      .closest(".draggable-item");
+    const bananasCard = screen
+      .getByRole("heading", { level: 3, name: "Bananas" })
+      .closest(".draggable-item");
+
+    expect(applesCard).toBeTruthy();
+    expect(bananasCard).toBeTruthy();
+
+    fireEvent.dragStart(applesCard as Element);
+    fireEvent.dragOver(bananasCard as Element);
+    fireEvent.drop(bananasCard as Element);
+    fireEvent.dragEnd(applesCard as Element);
+
+    await waitFor(() => {
+      expect(apiMock.reorderListItems).toHaveBeenCalledWith(listId, [
+        "list-item-2",
+        "list-item-1",
+      ]);
     });
   });
 });
