@@ -465,11 +465,18 @@
                       {#if item.purchased}
                         <div class="item-summary-checked">
                           <span>{item.name}</span>
+                          {#if item.qty !== null && item.qty !== undefined}
+                            <span>(x {item.qty})</span>
+                          {/if}
                         </div>
                       {:else}
                         <h3>{item.name}</h3>
+                        <div class="meta">
+                          {#if item.qty !== null && item.qty !== undefined}
+                            (x {item.qty})
+                          {/if}
+                        </div>
                       {/if}
-                      <div class="meta">Qty {item.qty ?? 0}</div>
                     </div>
                   </div>
                   <div class="toolbar">
