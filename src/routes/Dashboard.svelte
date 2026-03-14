@@ -110,6 +110,36 @@
     <section class="card stack">
       <div class="row">
         <div>
+          <h2>Latest lists</h2>
+          <p class="meta">Your five most recently created lists.</p>
+        </div>
+        <button class="button ghost" on:click={() => push("/lists")}>
+          Open lists
+        </button>
+      </div>
+
+      {#if summary.last_created_lists.length === 0}
+        <p class="meta">No lists yet.</p>
+      {:else}
+        <div class="list-grid">
+          {#each summary.last_created_lists as list}
+            <article class="card item-row">
+              <div>
+                <h3>{list.name}</h3>
+                <p class="meta">Created {formatDate(list.created_at)}</p>
+              </div>
+              <button class="button" on:click={() => push(`/lists/${list.id}`)}>
+                Open
+              </button>
+            </article>
+          {/each}
+        </div>
+      {/if}
+    </section>
+
+    <section class="card stack">
+      <div class="row">
+        <div>
           <h2>Latest templates</h2>
           <p class="meta">Your five most recently created templates.</p>
         </div>

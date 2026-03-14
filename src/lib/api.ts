@@ -123,6 +123,11 @@ export const api = {
     fetchJson<ItemOut>(`/items/${itemId}/toggle`, { method: "POST" }),
   deleteItem: (itemId: string) =>
     fetchJson<null>(`/items/${itemId}`, { method: "DELETE" }),
+  reorderListItems: (listId: string, itemIds: string[]) =>
+    fetchJson<ItemOut[]>(`/lists/${listId}/items/reorder`, {
+      method: "POST",
+      body: JSON.stringify({ item_ids: itemIds }),
+    }),
 
   listTemplates: () => fetchJson<TemplateOut[]>("/templates"),
   createTemplate: (payload: TemplateCreate) =>

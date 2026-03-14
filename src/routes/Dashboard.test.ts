@@ -23,6 +23,14 @@ describe("Dashboard route", () => {
           JSON.stringify({
             list_count: 3,
             templates_count: 7,
+            last_created_lists: [
+              {
+                id: "list-1",
+                name: "Weekly groceries",
+                created_at: "2026-01-02T00:00:00Z",
+                updated_at: "2026-01-02T00:00:00Z",
+              },
+            ],
             last_created_templates: [
               {
                 id: "template-1",
@@ -41,6 +49,7 @@ describe("Dashboard route", () => {
 
     expect(await screen.findByText("3")).toBeTruthy();
     expect(await screen.findByText("7")).toBeTruthy();
+    expect(await screen.findByText("Weekly groceries")).toBeTruthy();
     expect(await screen.findByText("Weekly basics")).toBeTruthy();
   });
 

@@ -118,4 +118,22 @@ describe("api client", () => {
     );
     expect(unauthorizedHandler).toHaveBeenCalledTimes(1);
   });
+
+  it("posts reordered item ids to the list reorder endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response("[]", { status: 200 })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const apiModule = await import("./api");
+    await apiModule.api.reorderListItems("list-1", ["item-3", "item-1", "item-2"]);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/lists/list-1/items/reorder"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ item_ids: ["item-3", "item-1", "item-2"] }),
+      })
+    );
+  });
 });

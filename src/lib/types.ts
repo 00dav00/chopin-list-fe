@@ -106,8 +106,16 @@ export type DashboardTemplateOut = {
   updated_at: string;
 };
 
+export type DashboardListOut = {
+  id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export type DashboardOut = {
   list_count: number;
   templates_count: number;
+  last_created_lists: DashboardListOut[];
   last_created_templates: DashboardTemplateOut[];
 };
