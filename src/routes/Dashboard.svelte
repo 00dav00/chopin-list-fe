@@ -122,15 +122,10 @@
 
         <div class="list-grid">
           {#each summary.last_created_lists as list}
-            <article class="card item-row">
-              <div>
-                <h3>{list.name}</h3>
-                <p class="meta">Created {formatDate(list.created_at)}</p>
-              </div>
-              <button class="button" on:click={() => push(`/lists/${list.id}`)}>
-                Open
-              </button>
-            </article>
+            <a class="card dashboard-recent-link" href={`#/lists/${list.id}`}>
+              <h3>{list.name}</h3>
+              <p class="meta">Created {formatDate(list.created_at)}</p>
+            </a>
           {/each}
         </div>
       </section>
@@ -147,15 +142,10 @@
 
         <div class="list-grid">
           {#each summary.last_created_templates as template}
-            <article class="card item-row">
-              <div>
-                <h3>{template.name}</h3>
-                <p class="meta">Created {formatDate(template.created_at)}</p>
-              </div>
-              <button class="button" on:click={() => push(`/templates/${template.id}`)}>
-                Open
-              </button>
-            </article>
+            <a class="card dashboard-recent-link" href={`#/templates/${template.id}`}>
+              <h3>{template.name}</h3>
+              <p class="meta">Created {formatDate(template.created_at)}</p>
+            </a>
           {/each}
         </div>
       </section>

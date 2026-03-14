@@ -57,8 +57,12 @@ describe("Dashboard route", () => {
     ).toBe("#/templates");
     expect(screen.queryByRole("button", { name: "Open lists" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Open templates" })).toBeNull();
-    expect(await screen.findByText("Weekly groceries")).toBeTruthy();
-    expect(await screen.findByText("Weekly basics")).toBeTruthy();
+    expect((await screen.findByText("Weekly groceries")).closest("a")?.getAttribute("href")).toBe(
+      "#/lists/list-1"
+    );
+    expect((await screen.findByText("Weekly basics")).closest("a")?.getAttribute("href")).toBe(
+      "#/templates/template-1"
+    );
   });
 
   it("shows api detail message when dashboard request fails", async () => {
