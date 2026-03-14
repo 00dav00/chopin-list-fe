@@ -469,30 +469,28 @@
                       {:else}
                         <h3>{item.name}</h3>
                       {/if}
-                      <div class="item-qty-controls">
-                        <button
-                          class="button ghost icon-button qty-inline-button"
-                          type="button"
-                          aria-label={`Decrease quantity for ${item.name}`}
-                          disabled={updatingQtyItemId === item.id}
-                          on:click={() => adjustItemQty(item, -1)}
-                        >
-                          -
-                        </button>
-                        <span class="qty-inline-value">Qty {item.qty ?? 0}</span>
-                        <button
-                          class="button ghost icon-button qty-inline-button"
-                          type="button"
-                          aria-label={`Increase quantity for ${item.name}`}
-                          disabled={updatingQtyItemId === item.id}
-                          on:click={() => adjustItemQty(item, 1)}
-                        >
-                          +
-                        </button>
-                      </div>
+                      <div class="meta">Qty {item.qty ?? 0}</div>
                     </div>
                   </div>
                   <div class="toolbar">
+                    <button
+                      class="button ghost icon-button qty-inline-button"
+                      type="button"
+                      aria-label={`Increase quantity for ${item.name}`}
+                      disabled={updatingQtyItemId === item.id}
+                      on:click={() => adjustItemQty(item, 1)}
+                    >
+                      +
+                    </button>
+                    <button
+                      class="button ghost icon-button qty-inline-button"
+                      type="button"
+                      aria-label={`Decrease quantity for ${item.name}`}
+                      disabled={updatingQtyItemId === item.id}
+                      on:click={() => adjustItemQty(item, -1)}
+                    >
+                      -
+                    </button>
                     <button
                       class="button ghost icon-button"
                       aria-label="Edit"
