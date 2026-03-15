@@ -11,6 +11,7 @@
   let error: string | null = null;
   let newName = "";
   let creating = false;
+  let createListModalOpen = false;
   let deletingId: string | null = null;
 
   const formatDate = (value: string) =>
@@ -40,6 +41,7 @@
       const created = await api.createList({ name });
       lists = [created, ...lists];
       newName = "";
+      createListModalOpen = false;
     } catch (err) {
       const message = getApiErrorMessage(err, "Create failed.");
       if (message) {
@@ -48,6 +50,16 @@
     } finally {
       creating = false;
     }
+  };
+
+  const openCreateListModal = () => {
+    newName = "";
+    createListModalOpen = true;
+  };
+
+  const closeCreateListModal = () => {
+    if (creating) return;
+    createListModalOpen = false;
   };
 
   const deleteList = async (listId: string) => {
@@ -94,16 +106,6 @@
   </header>
 
   <section class="card stack">
-    <div class="toolbar">
-      <input
-        class="input"
-        placeholder="New list name"
-        bind:value={newName}
-      />
-      <button class="button button-large" disabled={creating} on:click={createList}>
-        {creating ? "Creating..." : "Create list"}
-      </button>
-    </div>
     <div class="toolbar">
       <button class="button ghost" on:click={() => push("/templates")}>
         Create from template
@@ -162,4 +164,30 @@
       {/each}
     </section>
   {/if}
+
+  <button class="button floating-add-item" on:click={openCreateListModal}>
+    Add list
+  </button>
 </main>
+
+{#if createListModalOpen}
+  <div class="modal-backdrop" role="presentation" on:click|self={closeCreateListModal}>
+    <section
+      class="modal card stack"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="create-list-title"
+    >
+      <h3 id="create-list-title">Create list</h3>
+      <input class="input" placeholder="New list name" bind:value={newName} />
+      <div class="toolbar">
+        <button class="button ghost" disabled={creating} on:click={closeCreateListModal}>
+          Cancel
+        </button>
+        <button class="button" disabled={creating} on:click={createList}>
+          {creating ? "Creating..." : "Create list"}
+        </button>
+      </div>
+    </section>
+  </div>
+{/if}

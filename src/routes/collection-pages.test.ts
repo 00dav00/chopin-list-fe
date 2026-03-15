@@ -130,6 +130,9 @@ describe.each(collectionConfigs)("$name route", (config) => {
     if (config.name === "Templates") {
       await user.click(screen.getByRole("button", { name: "Add template" }));
     }
+    if (config.name === "Lists") {
+      await user.click(screen.getByRole("button", { name: "Add list" }));
+    }
 
     await user.type(
       await screen.findByPlaceholderText(config.inputPlaceholder),
