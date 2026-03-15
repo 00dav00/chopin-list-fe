@@ -407,53 +407,6 @@
   {:else if !list}
     <p class="meta">List not found.</p>
   {:else}
-    {#if purchasedItems.length > 0}
-      <section class="card stack">
-        <div class="row">
-          <div>
-            <h2>Purchased items</h2>
-          </div>
-        </div>
-
-        <div class="stack">
-          {#each purchasedItems as item (item.id)}
-            <div class="card item-row">
-              <div class="item-main">
-                <input
-                  class="item-checkbox"
-                  type="checkbox"
-                  checked={item.purchased}
-                  disabled={togglingItemId === item.id}
-                  aria-label={`Purchased ${item.name}`}
-                  on:change={() => toggleItem(item.id)}
-                />
-                <div class="item-summary-checked">
-                  <span>{item.name}</span>
-                  {#if item.qty !== null && item.qty !== undefined}
-                    <span>(x {item.qty})</span>
-                  {/if}
-                </div>
-              </div>
-              <div class="toolbar">
-                <button
-                  class="button danger icon-button"
-                  aria-label="Delete"
-                  title="Delete"
-                  on:click={() => deleteItem(item.id)}
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path
-                      d="M9 3h6l1 2h4v2H4V5h4l1-2zm-2 6h2v9H7V9zm4 0h2v9h-2V9zm4 0h2v9h-2V9zM6 21h12l1-14H5l1 14z"
-                    />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          {/each}
-        </div>
-      </section>
-    {/if}
-
     <section class="card stack">
       <div class="row">
         <div>
@@ -600,6 +553,53 @@
         </div>
       {/if}
     </section>
+
+    {#if purchasedItems.length > 0}
+      <section class="card stack">
+        <div class="row">
+          <div>
+            <h2>Purchased items</h2>
+          </div>
+        </div>
+
+        <div class="stack">
+          {#each purchasedItems as item (item.id)}
+            <div class="card item-row compact-item-card">
+              <div class="item-main">
+                <input
+                  class="item-checkbox"
+                  type="checkbox"
+                  checked={item.purchased}
+                  disabled={togglingItemId === item.id}
+                  aria-label={`Purchased ${item.name}`}
+                  on:change={() => toggleItem(item.id)}
+                />
+                <div class="item-summary-checked">
+                  <span>{item.name}</span>
+                  {#if item.qty !== null && item.qty !== undefined}
+                    <span>(x {item.qty})</span>
+                  {/if}
+                </div>
+              </div>
+              <div class="toolbar">
+                <button
+                  class="button danger icon-button"
+                  aria-label="Delete"
+                  title="Delete"
+                  on:click={() => deleteItem(item.id)}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      d="M9 3h6l1 2h4v2H4V5h4l1-2zm-2 6h2v9H7V9zm4 0h2v9h-2V9zm4 0h2v9h-2V9zM6 21h12l1-14H5l1 14z"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          {/each}
+        </div>
+      </section>
+    {/if}
 
     <button class="button floating-add-item" on:click={openAddItemModal}>
       Add item
