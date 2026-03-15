@@ -516,7 +516,7 @@
                       class="button ghost icon-button qty-inline-button"
                       type="button"
                       aria-label={`Decrease quantity for ${item.name}`}
-                      disabled={updatingQtyItemId === item.id}
+                      disabled={updatingQtyItemId === item.id || (item.qty ?? 0) <= 1}
                       on:click={() => adjustItemQty(item, -1)}
                     >
                       -

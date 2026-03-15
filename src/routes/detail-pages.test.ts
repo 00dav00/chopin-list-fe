@@ -606,6 +606,27 @@ describe("ListDetail route specific behavior", () => {
       ]);
     });
   });
+
+  it("disables list row decrease button when quantity is one", async () => {
+    apiMock.getList.mockResolvedValue(listBase);
+    apiMock.listItems.mockResolvedValue([
+      makeItem({
+        id: listPrimaryItemId,
+        list_id: listId,
+        name: "Apples",
+        qty: 1,
+        purchased: false,
+        sort_order: 1,
+      }),
+    ]);
+
+    render(ListDetail, { props: { params: { listId } } });
+
+    const decrease = await screen.findByRole("button", {
+      name: "Decrease quantity for Apples",
+    });
+    expect(decrease.hasAttribute("disabled")).toBe(true);
+  });
 });
 
 describe("TemplateDetail route specific behavior", () => {
@@ -679,5 +700,29 @@ describe("TemplateDetail route specific behavior", () => {
         }
       );
     });
+  });
+
+  it("disables template row decrease button when quantity is one", async () => {
+    apiMock.getTemplate.mockResolvedValue(
+      makeTemplateDetail({
+        ...templateBase,
+        items: [
+          makeTemplateItem({
+            id: templatePrimaryItemId,
+            template_id: templateId,
+            name: "Pasta",
+            qty: 1,
+            sort_order: 1,
+          }),
+        ],
+      })
+    );
+
+    render(TemplateDetail, { props: { params: { templateId } } });
+
+    const decrease = await screen.findByRole("button", {
+      name: "Decrease quantity for Pasta",
+    });
+    expect(decrease.hasAttribute("disabled")).toBe(true);
   });
 });
