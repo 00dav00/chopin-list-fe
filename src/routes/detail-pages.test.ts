@@ -475,6 +475,49 @@ describe("ListDetail route specific behavior", () => {
     expect(await screen.findByText("Apples")).toBeTruthy();
   });
 
+  it("moves an item back to main list when unchecked in purchased section", async () => {
+    const user = userEvent.setup();
+    apiMock.getList.mockResolvedValue(listBase);
+    apiMock.listItems.mockResolvedValue([
+      makeItem({
+        id: listPrimaryItemId,
+        list_id: listId,
+        name: "Apples",
+        purchased: true,
+        sort_order: 1,
+      }),
+      makeItem({
+        id: "list-item-2",
+        list_id: listId,
+        name: "Bananas",
+        purchased: false,
+        sort_order: 2,
+      }),
+    ]);
+    apiMock.toggleItem.mockResolvedValue(
+      makeItem({
+        id: listPrimaryItemId,
+        list_id: listId,
+        name: "Apples",
+        purchased: false,
+        sort_order: 1,
+      })
+    );
+
+    render(ListDetail, { props: { params: { listId } } });
+
+    await user.click(
+      (await screen.findAllByRole("checkbox", {
+        name: "Purchased Apples",
+      }))[0]
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByRole("heading", { name: "Purchased items" })).toBeNull();
+    });
+    expect(await screen.findByRole("heading", { level: 3, name: "Apples" })).toBeTruthy();
+  });
+
   it("reorders items and persists the new order", async () => {
     apiMock.getList.mockResolvedValue(listBase);
     apiMock.listItems.mockResolvedValue([
