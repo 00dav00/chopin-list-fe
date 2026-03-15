@@ -12,6 +12,9 @@
   let newName = "";
   let creating = false;
   let deletingId: string | null = null;
+  let createListModalTemplate: TemplateOut | null = null;
+  let createListName = "";
+  let creatingListFromTemplate = false;
 
   const formatDate = (value: string) =>
     new Date(value).toLocaleDateString();
@@ -66,6 +69,37 @@
       }
     } finally {
       deletingId = null;
+    }
+  };
+
+  const openCreateListModal = (template: TemplateOut) => {
+    createListModalTemplate = template;
+    createListName = "";
+  };
+
+  const closeCreateListModal = () => {
+    if (creatingListFromTemplate) return;
+    createListModalTemplate = null;
+    createListName = "";
+  };
+
+  const createListFromTemplate = async () => {
+    if (!createListModalTemplate || creatingListFromTemplate) return;
+    creatingListFromTemplate = true;
+    error = null;
+    try {
+      const created = await api.createListFromTemplate(createListModalTemplate.id, {
+        name: createListName.trim() || null,
+      });
+      closeCreateListModal();
+      push(`/lists/${created.id}`);
+    } catch (err) {
+      const message = getApiErrorMessage(err, "Create failed.");
+      if (message) {
+        error = message;
+      }
+    } finally {
+      creatingListFromTemplate = false;
     }
   };
 
@@ -135,6 +169,17 @@
               </svg>
             </button>
             <button
+              class="button ghost icon-button"
+              aria-label="Create list from template"
+              title="Create list"
+              on:click={() => openCreateListModal(template)}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M14 3h7v7h-2V6.41l-9.29 9.3-1.42-1.42 9.3-9.29H14V3z" />
+                <path d="M5 5h6v2H7v10h10v-4h2v6H5V5z" />
+              </svg>
+            </button>
+            <button
               class="button danger icon-button"
               aria-label="Delete"
               title="Delete"
@@ -157,3 +202,38 @@
     </section>
   {/if}
 </main>
+
+{#if createListModalTemplate}
+  <div class="modal-backdrop" role="presentation" on:click|self={closeCreateListModal}>
+    <section
+      class="modal card stack"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="create-list-from-template-title"
+    >
+      <h3 id="create-list-from-template-title">Create list from template</h3>
+      <p class="meta">Template: {createListModalTemplate.name}</p>
+      <input
+        class="input"
+        placeholder="Optional list name"
+        bind:value={createListName}
+      />
+      <div class="toolbar">
+        <button
+          class="button ghost"
+          disabled={creatingListFromTemplate}
+          on:click={closeCreateListModal}
+        >
+          Cancel
+        </button>
+        <button
+          class="button"
+          disabled={creatingListFromTemplate}
+          on:click={createListFromTemplate}
+        >
+          {creatingListFromTemplate ? "Creating..." : "Create list"}
+        </button>
+      </div>
+    </section>
+  </div>
+{/if}

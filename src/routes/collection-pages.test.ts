@@ -15,6 +15,7 @@ const { pushMock, apiMock, TestApiError } = vi.hoisted(() => ({
     listTemplates: vi.fn(),
     createTemplate: vi.fn(),
     deleteTemplate: vi.fn(),
+    createListFromTemplate: vi.fn(),
   },
   TestApiError: class extends Error {
     status: number;
@@ -179,5 +180,41 @@ describe.each(collectionConfigs)("$name route", (config) => {
     expect(await screen.findByText(config.emptyStateText)).toBeTruthy();
     expect(screen.queryByText("Unauthorized")).toBeNull();
     expect(screen.queryByText("Load failed.")).toBeNull();
+  });
+});
+
+describe("Templates route specific behavior", () => {
+  beforeEach(() => {
+    resetApiMocks();
+    pushMock.mockReset();
+  });
+
+  it("creates a list directly from a template", async () => {
+    const user = userEvent.setup();
+    const template = makeTemplate({
+      id: "template-1",
+      name: "Weekly prep",
+    });
+    apiMock.listTemplates.mockResolvedValue([template]);
+    apiMock.createListFromTemplate.mockResolvedValue(
+      makeList({
+        id: "list-from-template",
+        name: "Weekend run",
+      })
+    );
+
+    render(Templates);
+
+    await screen.findByText("Weekly prep");
+    await user.click(screen.getByRole("button", { name: "Create list from template" }));
+    await user.type(await screen.findByPlaceholderText("Optional list name"), "Weekend run");
+    await user.click(screen.getByRole("button", { name: "Create list" }));
+
+    await waitFor(() => {
+      expect(apiMock.createListFromTemplate).toHaveBeenCalledWith("template-1", {
+        name: "Weekend run",
+      });
+    });
+    expect(pushMock).toHaveBeenCalledWith("/lists/list-from-template");
   });
 });
