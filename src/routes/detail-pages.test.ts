@@ -450,7 +450,16 @@ describe("ListDetail route specific behavior", () => {
 
   it("reorders items and persists the new order", async () => {
     apiMock.getList.mockResolvedValue(listBase);
-    apiMock.listItems.mockResolvedValue(listItemsUnsorted);
+    apiMock.listItems.mockResolvedValue([
+      ...listItemsUnsorted,
+      makeItem({
+        id: "list-item-purchased",
+        list_id: listId,
+        name: "Bread",
+        purchased: true,
+        sort_order: 3,
+      }),
+    ]);
     apiMock.reorderListItems.mockResolvedValue([
       makeItem({
         id: "list-item-2",
@@ -464,6 +473,13 @@ describe("ListDetail route specific behavior", () => {
         name: "Apples",
         sort_order: 1,
       }),
+      makeItem({
+        id: "list-item-purchased",
+        list_id: listId,
+        name: "Bread",
+        purchased: true,
+        sort_order: 2,
+      }),
     ]);
 
     render(ListDetail, { props: { params: { listId } } });
@@ -475,6 +491,7 @@ describe("ListDetail route specific behavior", () => {
     const bananasCard = screen
       .getByRole("heading", { level: 3, name: "Bananas" })
       .closest(".draggable-item");
+    expect(screen.queryByRole("heading", { level: 3, name: "Bread" })).toBeNull();
 
     expect(applesCard).toBeTruthy();
     expect(bananasCard).toBeTruthy();
@@ -488,6 +505,7 @@ describe("ListDetail route specific behavior", () => {
       expect(apiMock.reorderListItems).toHaveBeenCalledWith(listId, [
         "list-item-2",
         "list-item-1",
+        "list-item-purchased",
       ]);
     });
   });

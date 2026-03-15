@@ -31,6 +31,7 @@
 
   let currentListId = "";
   $: purchasedItems = items.filter((item) => item.purchased);
+  $: unpurchasedItems = items.filter((item) => !item.purchased);
 
   const parseOptionalNumber = (value: string) => {
     const trimmed = value.trim();
@@ -455,11 +456,11 @@
         </div>
       </div>
 
-      {#if items.length === 0}
+      {#if unpurchasedItems.length === 0}
         <p class="meta">No items yet.</p>
       {:else}
         <div class="stack">
-          {#each items as item}
+          {#each unpurchasedItems as item}
             <div
               class="card draggable-item"
               class:drag-over={dragOverItemId === item.id}
