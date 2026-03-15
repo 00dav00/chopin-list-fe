@@ -11,6 +11,7 @@
   let error: string | null = null;
   let newName = "";
   let creating = false;
+  let createTemplateModalOpen = false;
   let deletingId: string | null = null;
   let createListModalTemplate: TemplateOut | null = null;
   let createListName = "";
@@ -44,6 +45,7 @@
       const { items, ...templateSummary } = created;
       templates = [templateSummary, ...templates];
       newName = "";
+      createTemplateModalOpen = false;
     } catch (err) {
       const message = getApiErrorMessage(err, "Create failed.");
       if (message) {
@@ -52,6 +54,16 @@
     } finally {
       creating = false;
     }
+  };
+
+  const openCreateTemplateModal = () => {
+    newName = "";
+    createTemplateModalOpen = true;
+  };
+
+  const closeCreateTemplateModal = () => {
+    if (creating) return;
+    createTemplateModalOpen = false;
   };
 
   const deleteTemplate = async (templateId: string) => {
@@ -126,19 +138,6 @@
     </div>
   </header>
 
-  <section class="card stack">
-    <div class="toolbar">
-      <input
-        class="input"
-        placeholder="New template name"
-        bind:value={newName}
-      />
-      <button class="button" disabled={creating} on:click={createTemplate}>
-        {creating ? "Creating..." : "Create template"}
-      </button>
-    </div>
-  </section>
-
   {#if loading}
     <p class="meta">Loading templates...</p>
   {:else if error}
@@ -197,7 +196,37 @@
       {/each}
     </section>
   {/if}
+
+  <button class="button floating-add-item" on:click={openCreateTemplateModal}>
+    Add template
+  </button>
 </main>
+
+{#if createTemplateModalOpen}
+  <div class="modal-backdrop" role="presentation" on:click|self={closeCreateTemplateModal}>
+    <section
+      class="modal card stack"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="create-template-title"
+    >
+      <h3 id="create-template-title">Create template</h3>
+      <input
+        class="input"
+        placeholder="New template name"
+        bind:value={newName}
+      />
+      <div class="toolbar">
+        <button class="button ghost" disabled={creating} on:click={closeCreateTemplateModal}>
+          Cancel
+        </button>
+        <button class="button" disabled={creating} on:click={createTemplate}>
+          {creating ? "Creating..." : "Create template"}
+        </button>
+      </div>
+    </section>
+  </div>
+{/if}
 
 {#if createListModalTemplate}
   <div class="modal-backdrop" role="presentation" on:click|self={closeCreateListModal}>
