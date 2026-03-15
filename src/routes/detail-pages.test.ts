@@ -518,6 +518,33 @@ describe("ListDetail route specific behavior", () => {
     expect(await screen.findByRole("heading", { level: 3, name: "Apples" })).toBeTruthy();
   });
 
+  it("loads purchased items into purchased section and hides them in main list", async () => {
+    apiMock.getList.mockResolvedValue(listBase);
+    apiMock.listItems.mockResolvedValue([
+      makeItem({
+        id: listPrimaryItemId,
+        list_id: listId,
+        name: "Apples",
+        purchased: true,
+        sort_order: 1,
+      }),
+      makeItem({
+        id: "list-item-2",
+        list_id: listId,
+        name: "Bananas",
+        purchased: false,
+        sort_order: 2,
+      }),
+    ]);
+
+    render(ListDetail, { props: { params: { listId } } });
+
+    expect(await screen.findByRole("heading", { name: "Purchased items" })).toBeTruthy();
+    expect(await screen.findByText("Apples")).toBeTruthy();
+    expect(screen.queryByRole("heading", { level: 3, name: "Apples" })).toBeNull();
+    expect(await screen.findByRole("heading", { level: 3, name: "Bananas" })).toBeTruthy();
+  });
+
   it("reorders items and persists the new order", async () => {
     apiMock.getList.mockResolvedValue(listBase);
     apiMock.listItems.mockResolvedValue([
