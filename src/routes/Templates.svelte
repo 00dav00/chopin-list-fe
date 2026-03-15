@@ -157,7 +157,7 @@
           </div>
           <div class="toolbar">
             <button
-              class="button ghost icon-button"
+              class="button icon-button"
               aria-label="Create list from template"
               title="Create list"
               on:click={() => openCreateListModal(template)}
@@ -167,7 +167,7 @@
               </svg>
             </button>
             <button
-              class="button icon-button"
+              class="button ghost icon-button"
               aria-label="Open"
               title="Open"
               on:click={() => push(`/templates/${template.id}`)}
