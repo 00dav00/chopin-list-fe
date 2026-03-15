@@ -124,17 +124,32 @@
           </div>
           <div class="toolbar">
             <button
-              class="button"
+              class="button icon-button"
+              aria-label="Open"
+              title="Open"
               on:click={() => push(`/templates/${template.id}`)}
             >
-              Open
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M14 3h7v7h-2V6.41l-9.29 9.3-1.42-1.42 9.3-9.29H14V3z" />
+                <path d="M5 5h6v2H7v10h10v-4h2v6H5V5z" />
+              </svg>
             </button>
             <button
-              class="button ghost"
+              class="button danger icon-button"
+              aria-label="Delete"
+              title="Delete"
               disabled={deletingId === template.id}
               on:click={() => deleteTemplate(template.id)}
             >
-              {deletingId === template.id ? "Deleting..." : "Delete"}
+              {#if deletingId === template.id}
+                ...
+              {:else}
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="M9 3h6l1 2h4v2H4V5h4l1-2zm-2 6h2v9H7V9zm4 0h2v9h-2V9zm4 0h2v9h-2V9zM6 21h12l1-14H5l1 14z"
+                  />
+                </svg>
+              {/if}
             </button>
           </div>
         </article>
