@@ -158,6 +158,16 @@
           </div>
           <div class="toolbar">
             <button
+              class="button ghost icon-button"
+              aria-label="Create list from template"
+              title="Create list"
+              on:click={() => openCreateListModal(template)}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M5 20h14v-2H5v2zm7-16-5 5h3v6h4V9h3l-5-5z" />
+              </svg>
+            </button>
+            <button
               class="button icon-button"
               aria-label="Open"
               title="Open"
@@ -167,16 +177,6 @@
                 <path
                   d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm14.71-9.04a1.003 1.003 0 0 0 0-1.42l-2.5-2.5a1.003 1.003 0 0 0-1.42 0l-1.79 1.79 3.75 3.75 1.96-1.62z"
                 />
-              </svg>
-            </button>
-            <button
-              class="button ghost icon-button"
-              aria-label="Create list from template"
-              title="Create list"
-              on:click={() => openCreateListModal(template)}
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M5 20h14v-2H5v2zm7-16-5 5h3v6h4V9h3l-5-5z" />
               </svg>
             </button>
             <button
