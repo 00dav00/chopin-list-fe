@@ -132,15 +132,30 @@
             {/if}
           </div>
           <div class="toolbar">
-            <button class="button" on:click={() => push(`/lists/${list.id}`)}>
-              Open
+            <button
+              class="button icon-button"
+              aria-label="Open"
+              title="Open"
+              on:click={() => push(`/lists/${list.id}`)}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm14.71-9.04a1.003 1.003 0 0 0 0-1.42l-2.5-2.5a1.003 1.003 0 0 0-1.42 0l-1.79 1.79 3.75 3.75 1.96-1.62z"
+                />
+              </svg>
             </button>
             <button
-              class="button ghost"
+              class="button danger icon-button"
+              aria-label="Delete"
+              title="Delete"
               disabled={deletingId === list.id}
               on:click={() => deleteList(list.id)}
             >
-              {deletingId === list.id ? "Deleting..." : "Delete"}
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M9 3h6l1 2h4v2H4V5h4l1-2zm-2 6h2v9H7V9zm4 0h2v9h-2V9zm4 0h2v9h-2V9zM6 21h12l1-14H5l1 14z"
+                />
+              </svg>
             </button>
           </div>
         </article>
