@@ -410,9 +410,9 @@ describe("ListDetail route specific behavior", () => {
 
     render(ListDetail, { props: { params: { listId } } });
 
-    const checkbox = (await screen.findByRole("checkbox", {
+    const checkbox = (await screen.findAllByRole("checkbox", {
       name: "Purchased Apples",
-    })) as HTMLInputElement;
+    }))[0] as HTMLInputElement;
     expect(checkbox.checked).toBe(false);
     await user.click(checkbox);
 
@@ -420,12 +420,32 @@ describe("ListDetail route specific behavior", () => {
       expect(apiMock.toggleItem).toHaveBeenCalledWith(listPrimaryItemId);
     });
     await waitFor(() => {
-      expect(
-        (screen.getByRole("checkbox", {
+      const toggled = screen
+        .getAllByRole("checkbox", {
           name: "Purchased Apples",
-        }) as HTMLInputElement).checked
-      ).toBe(true);
+        })
+        .map((node) => node as HTMLInputElement);
+      expect(toggled.some((node) => node.checked)).toBe(true);
     });
+  });
+
+  it("renders purchased items in dedicated section", async () => {
+    apiMock.getList.mockResolvedValue(listBase);
+    apiMock.listItems.mockResolvedValue([
+      ...listItemsUnsorted,
+      makeItem({
+        id: "list-item-purchased",
+        list_id: listId,
+        name: "Bread",
+        purchased: true,
+        sort_order: 3,
+      }),
+    ]);
+
+    render(ListDetail, { props: { params: { listId } } });
+
+    expect(await screen.findByRole("heading", { name: "Purchased items" })).toBeTruthy();
+    expect((await screen.findAllByText("Bread")).length).toBeGreaterThan(0);
   });
 
   it("reorders items and persists the new order", async () => {
