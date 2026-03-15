@@ -292,6 +292,12 @@ describe.each(detailConfigs)("$name route", (config) => {
     render(config.component, { props: config.props });
 
     await screen.findByText(config.itemNameForEdit);
+    await user.click(
+      screen.getByRole("button", {
+        name:
+          config.name === "ListDetail" ? "Edit list name" : "Edit template name",
+      })
+    );
     const nameInput = await screen.findByDisplayValue(
       config.name === "ListDetail" ? listBase.name : templateBase.name
     );

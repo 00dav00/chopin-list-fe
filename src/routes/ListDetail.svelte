@@ -13,6 +13,7 @@
   let error: string | null = null;
   let listName = "";
   let savingName = false;
+  let renameModalOpen = false;
 
   let newItemName = "";
   let newItemQty = "1";
@@ -111,6 +112,7 @@
     try {
       list = await api.updateList(list.id, { name });
       listName = list.name;
+      renameModalOpen = false;
     } catch (err) {
       const message = getApiErrorMessage(err, "Update failed.");
       if (message) {
@@ -152,6 +154,17 @@
     newItemName = "";
     newItemQty = "1";
     addItemModalOpen = true;
+  };
+
+  const openRenameModal = () => {
+    if (!list) return;
+    listName = list.name;
+    renameModalOpen = true;
+  };
+
+  const closeRenameModal = () => {
+    if (savingName) return;
+    renameModalOpen = false;
   };
 
   const closeAddItemModal = () => {
@@ -351,7 +364,22 @@
 <main>
   <header class="page-header">
     <div>
-      <h1>{list ? list.name : "List"}</h1>
+      <div class="title-with-action">
+        <h1>{list ? list.name : "List"}</h1>
+        <button
+          class="button ghost icon-button"
+          type="button"
+          aria-label="Edit list name"
+          title="Edit name"
+          on:click={openRenameModal}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm14.71-9.04a1.003 1.003 0 0 0 0-1.42l-2.5-2.5a1.003 1.003 0 0 0-1.42 0l-1.79 1.79 3.75 3.75 1.96-1.62z"
+            />
+          </svg>
+        </button>
+      </div>
       <p>Manage items and keep things in sync.</p>
     </div>
     <div class="nav-links">
@@ -373,21 +401,6 @@
   {:else if !list}
     <p class="meta">List not found.</p>
   {:else}
-    <section class="card stack">
-      <div class="row">
-        <div>
-          <h2>List details</h2>
-          <p class="meta">Rename the list to keep it current.</p>
-        </div>
-        <div class="toolbar">
-          <input class="input" bind:value={listName} />
-          <button class="button" disabled={savingName} on:click={updateListName}>
-            {savingName ? "Saving..." : "Save name"}
-          </button>
-        </div>
-      </div>
-    </section>
-
     <section class="card stack">
       <div class="row">
         <div>
@@ -584,6 +597,28 @@
         </button>
         <button class="button" disabled={creatingItem} on:click={createItem}>
           {creatingItem ? "Creating..." : "Create item"}
+        </button>
+      </div>
+    </section>
+  </div>
+{/if}
+
+{#if renameModalOpen}
+  <div class="modal-backdrop" role="presentation" on:click|self={closeRenameModal}>
+    <section
+      class="modal card stack"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="rename-list-title"
+    >
+      <h3 id="rename-list-title">Change list name</h3>
+      <input class="input" placeholder="List name" bind:value={listName} />
+      <div class="toolbar">
+        <button class="button ghost" disabled={savingName} on:click={closeRenameModal}>
+          Cancel
+        </button>
+        <button class="button" disabled={savingName} on:click={updateListName}>
+          {savingName ? "Saving..." : "Save name"}
         </button>
       </div>
     </section>
