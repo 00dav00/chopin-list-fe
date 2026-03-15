@@ -154,6 +154,7 @@
           <div>
             <h2>{template.name}</h2>
             <p class="meta">Updated {formatDate(template.updated_at)}</p>
+            <p class="meta">{template.items_count} items</p>
           </div>
           <div class="toolbar">
             <button

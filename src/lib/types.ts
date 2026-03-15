@@ -12,6 +12,7 @@ export type ListOut = {
   user_id: string;
   name: string;
   template_id?: string | null;
+  items_count: number;
   created_at: string;
   updated_at: string;
 };
@@ -55,6 +56,7 @@ export type TemplateOut = {
   id: string;
   user_id: string;
   name: string;
+  items_count: number;
   created_at: string;
   updated_at: string;
 };

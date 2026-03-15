@@ -129,6 +129,7 @@
           <div>
             <h2>{list.name}</h2>
             <p class="meta">Updated {formatDate(list.updated_at)}</p>
+            <p class="meta">{list.items_count} items</p>
             {#if list.template_id}
               <span class="badge">From template</span>
             {/if}

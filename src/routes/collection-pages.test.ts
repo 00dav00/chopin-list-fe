@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Lists from "./Lists.svelte";
 import Templates from "./Templates.svelte";
+import type { ListOut, TemplateOut } from "../lib/types";
 import { makeList, makeTemplate, makeTemplateDetail } from "../test/utils/factories";
 
 const { pushMock, apiMock, TestApiError } = vi.hoisted(() => ({
@@ -49,7 +50,7 @@ type CollectionConfig = {
   createButtonLabel: string;
   emptyStateText: string;
   buildCreatePayload: (name: string) => unknown;
-  makeExistingEntity: () => { id: string; name: string };
+  makeExistingEntity: () => ListOut | TemplateOut;
   makeCreatedEntity: (name: string) => unknown;
 };
 
@@ -68,6 +69,7 @@ const collectionConfigs: CollectionConfig[] = [
       makeList({
         id: "list-existing",
         name: "Family groceries",
+        items_count: 3,
       }),
     makeCreatedEntity: (name) =>
       makeList({
@@ -89,6 +91,7 @@ const collectionConfigs: CollectionConfig[] = [
       makeTemplate({
         id: "template-existing",
         name: "Bulk shopping",
+        items_count: 4,
       }),
     makeCreatedEntity: (name) =>
       makeTemplateDetail({
@@ -117,6 +120,7 @@ describe.each(collectionConfigs)("$name route", (config) => {
     render(config.component);
 
     expect(await screen.findByText(existing.name)).toBeTruthy();
+    expect(screen.getByText(`${existing.items_count} items`)).toBeTruthy();
   });
 
   it("creates a new entry", async () => {
@@ -146,6 +150,7 @@ describe.each(collectionConfigs)("$name route", (config) => {
       );
     });
     expect(await screen.findByText(createdName)).toBeTruthy();
+    expect(screen.getByText("0 items")).toBeTruthy();
   });
 
   it("deletes an existing entry", async () => {
