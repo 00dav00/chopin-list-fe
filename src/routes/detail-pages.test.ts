@@ -642,4 +642,42 @@ describe("TemplateDetail route specific behavior", () => {
     });
     expect(pushMock).toHaveBeenCalledWith("/lists/list-from-template");
   });
+
+  it("adjusts template item quantity from item row controls", async () => {
+    const user = userEvent.setup();
+    apiMock.getTemplate.mockResolvedValue(
+      makeTemplateDetail({
+        ...templateBase,
+        items: templateItemsUnsorted,
+      })
+    );
+    apiMock.updateTemplateItem.mockResolvedValue(
+      makeTemplateItem({
+        id: templatePrimaryItemId,
+        template_id: templateId,
+        name: "Pasta",
+        qty: 1,
+        sort_order: 1,
+      })
+    );
+
+    render(TemplateDetail, { props: { params: { templateId } } });
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: "Increase quantity for Pasta",
+      })
+    );
+
+    await waitFor(() => {
+      expect(apiMock.updateTemplateItem).toHaveBeenCalledWith(
+        templateId,
+        templatePrimaryItemId,
+        {
+          name: "Pasta",
+          qty: 1,
+        }
+      );
+    });
+  });
 });

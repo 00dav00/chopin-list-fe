@@ -24,6 +24,7 @@
   let editName = "";
   let editQty = "";
   let savingItem = false;
+  let updatingQtyItemId: string | null = null;
 
   let createListName = "";
   let creatingList = false;
@@ -175,6 +176,33 @@
       if (message) {
         error = message;
       }
+    }
+  };
+
+  const adjustTemplateItemQty = async (item: TemplateItemOut, delta: number) => {
+    if (!template || editingItemId === item.id || updatingQtyItemId) return;
+
+    const currentQty = item.qty ?? 0;
+    const nextQty = Math.max(0, currentQty + delta);
+    if (nextQty === currentQty) return;
+
+    updatingQtyItemId = item.id;
+    error = null;
+    try {
+      const updated = await api.updateTemplateItem(template.id, item.id, {
+        name: item.name,
+        qty: nextQty,
+      });
+      items = sortItems(
+        items.map((entry) => (entry.id === item.id ? updated : entry))
+      );
+    } catch (err) {
+      const message = getApiErrorMessage(err, "Update failed.");
+      if (message) {
+        error = message;
+      }
+    } finally {
+      updatingQtyItemId = null;
     }
   };
 
@@ -368,6 +396,24 @@
                     </div>
                   </div>
                   <div class="toolbar">
+                    <button
+                      class="button ghost icon-button qty-inline-button"
+                      type="button"
+                      aria-label={`Increase quantity for ${item.name}`}
+                      disabled={updatingQtyItemId === item.id}
+                      on:click={() => adjustTemplateItemQty(item, 1)}
+                    >
+                      +
+                    </button>
+                    <button
+                      class="button ghost icon-button qty-inline-button"
+                      type="button"
+                      aria-label={`Decrease quantity for ${item.name}`}
+                      disabled={updatingQtyItemId === item.id}
+                      on:click={() => adjustTemplateItemQty(item, -1)}
+                    >
+                      -
+                    </button>
                     <button
                       class="button ghost icon-button"
                       aria-label="Edit"
