@@ -2,6 +2,7 @@ import { render, screen, waitFor } from "@testing-library/svelte";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Lists from "./Lists.svelte";
+import CompletedLists from "./CompletedLists.svelte";
 import Templates from "./Templates.svelte";
 import type { ListOut, TemplateOut } from "../lib/types";
 import { makeList, makeTemplate, makeTemplateDetail } from "../test/utils/factories";
@@ -11,7 +12,10 @@ const { pushMock, apiMock, TestApiError } = vi.hoisted(() => ({
   apiMock: {
     getMe: vi.fn(),
     listLists: vi.fn(),
+    listCompletedLists: vi.fn(),
     createList: vi.fn(),
+    completeList: vi.fn(),
+    activateList: vi.fn(),
     deleteList: vi.fn(),
     listTemplates: vi.fn(),
     createTemplate: vi.fn(),
@@ -228,5 +232,54 @@ describe("Templates route specific behavior", () => {
       });
     });
     expect(pushMock).toHaveBeenCalledWith("/lists/list-from-template");
+  });
+});
+
+describe("Completed list lifecycle routes", () => {
+  beforeEach(() => {
+    resetApiMocks();
+    pushMock.mockReset();
+  });
+
+  it("marks an active list complete from Lists page", async () => {
+    const user = userEvent.setup();
+    const active = makeList({ id: "list-active", name: "Errands", completed: false });
+    apiMock.listLists.mockResolvedValue([active]);
+    apiMock.completeList.mockResolvedValue({ ...active, completed: true });
+
+    render(Lists);
+
+    await screen.findByText("Errands");
+    await user.click(screen.getByRole("button", { name: "Mark complete" }));
+
+    await waitFor(() => {
+      expect(apiMock.completeList).toHaveBeenCalledWith("list-active");
+    });
+    await waitFor(() => {
+      expect(screen.queryByText("Errands")).toBeNull();
+    });
+  });
+
+  it("loads completed lists and marks one active", async () => {
+    const user = userEvent.setup();
+    const completed = makeList({
+      id: "list-completed",
+      name: "Finished run",
+      completed: true,
+    });
+    apiMock.listCompletedLists.mockResolvedValue([completed]);
+    apiMock.activateList.mockResolvedValue({ ...completed, completed: false });
+
+    render(CompletedLists);
+
+    await screen.findByText("Finished run");
+    await user.click(screen.getByRole("button", { name: "Mark active" }));
+
+    await waitFor(() => {
+      expect(apiMock.activateList).toHaveBeenCalledWith("list-completed");
+    });
+    await waitFor(() => {
+      expect(screen.queryByText("Finished run")).toBeNull();
+    });
   });
 });

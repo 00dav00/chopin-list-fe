@@ -96,7 +96,9 @@
     <section class="dashboard-grid">
       <a class="card stack dashboard-link-card" href="#/lists" aria-label="Open lists">
         <h2>Lists</h2>
-        <p class="dashboard-value">{summary.list_count}</p>
+        <p class="dashboard-value">{summary.active_list_count}</p>
+        <p class="meta">active</p>
+        <p class="dashboard-subvalue">{summary.completed_list_count} completed</p>
       </a>
 
       <a

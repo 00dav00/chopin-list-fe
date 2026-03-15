@@ -17,6 +17,8 @@ const { pushMock, apiMock, TestApiError } = vi.hoisted(() => ({
     getMe: vi.fn(),
     getList: vi.fn(),
     listItems: vi.fn(),
+    completeList: vi.fn(),
+    activateList: vi.fn(),
     updateList: vi.fn(),
     createItem: vi.fn(),
     updateItem: vi.fn(),
@@ -626,6 +628,27 @@ describe("ListDetail route specific behavior", () => {
       name: "Decrease quantity for Apples",
     });
     expect(decrease.hasAttribute("disabled")).toBe(true);
+  });
+
+  it("shows mark active and read-only state for completed lists", async () => {
+    const user = userEvent.setup();
+    apiMock.getList.mockResolvedValue({ ...listBase, completed: true });
+    apiMock.listItems.mockResolvedValue(listItemsUnsorted);
+    apiMock.activateList.mockResolvedValue({ ...listBase, completed: false });
+
+    render(ListDetail, { props: { params: { listId } } });
+
+    expect(await screen.findByText("This list is completed and read-only.")).toBeTruthy();
+    const addButton = screen.getByRole("button", { name: "Add item" });
+    expect(addButton.hasAttribute("disabled")).toBe(true);
+
+    await user.click(screen.getByRole("button", { name: "Mark active" }));
+    await waitFor(() => {
+      expect(apiMock.activateList).toHaveBeenCalledWith(listId);
+    });
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Mark complete" })).toBeTruthy();
+    });
   });
 });
 

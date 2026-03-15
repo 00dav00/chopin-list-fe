@@ -136,4 +136,22 @@ describe("api client", () => {
       })
     );
   });
+
+  it("hits completed list lifecycle endpoints", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response("[]", { status: 200 }))
+      .mockResolvedValueOnce(new Response("{}", { status: 200 }))
+      .mockResolvedValueOnce(new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const apiModule = await import("./api");
+    await apiModule.api.listCompletedLists();
+    await apiModule.api.completeList("list-42");
+    await apiModule.api.activateList("list-42");
+
+    expect(fetchMock.mock.calls[0]?.[0]).toContain("/lists/completed");
+    expect(fetchMock.mock.calls[1]?.[0]).toContain("/lists/list-42/complete");
+    expect(fetchMock.mock.calls[2]?.[0]).toContain("/lists/list-42/activate");
+  });
 });

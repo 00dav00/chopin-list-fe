@@ -14,6 +14,8 @@
   let listName = "";
   let savingName = false;
   let renameModalOpen = false;
+  let completingList = false;
+  let activatingList = false;
 
   let newItemName = "";
   let newItemQty = "1";
@@ -31,6 +33,7 @@
   let dragOverItemId: string | null = null;
 
   let currentListId = "";
+  $: isListCompleted = list?.completed ?? false;
   $: purchasedItems = items.filter((item) => item.purchased);
   $: unpurchasedItems = items.filter((item) => !item.purchased);
 
@@ -107,7 +110,7 @@
   };
 
   const updateListName = async () => {
-    if (!list || savingName) return;
+    if (!list || savingName || isListCompleted) return;
     const name = listName.trim();
     if (!name) return;
     savingName = true;
@@ -127,7 +130,7 @@
   };
 
   const createItem = async () => {
-    if (!list || creatingItem) return;
+    if (!list || creatingItem || isListCompleted) return;
     const name = newItemName.trim();
     if (!name) return;
     creatingItem = true;
@@ -154,13 +157,14 @@
   };
 
   const openAddItemModal = () => {
+    if (isListCompleted) return;
     newItemName = "";
     newItemQty = "1";
     addItemModalOpen = true;
   };
 
   const openRenameModal = () => {
-    if (!list) return;
+    if (!list || isListCompleted) return;
     listName = list.name;
     renameModalOpen = true;
   };
@@ -197,7 +201,7 @@
   };
 
   const handleDragStart = (event: DragEvent, itemId: string) => {
-    if (editingItemId || reorderingItems) {
+    if (editingItemId || reorderingItems || isListCompleted) {
       event.preventDefault();
       return;
     }
@@ -210,7 +214,13 @@
   };
 
   const handleDragOver = (event: DragEvent, targetItemId: string) => {
-    if (!draggedItemId || draggedItemId === targetItemId || reorderingItems) return;
+    if (
+      !draggedItemId ||
+      draggedItemId === targetItemId ||
+      reorderingItems ||
+      isListCompleted
+    )
+      return;
     event.preventDefault();
     if (event.dataTransfer) {
       event.dataTransfer.dropEffect = "move";
@@ -262,7 +272,7 @@
   };
 
   const toggleItem = async (itemId: string) => {
-    if (togglingItemId) return;
+    if (togglingItemId || isListCompleted) return;
     togglingItemId = itemId;
     error = null;
     try {
@@ -281,6 +291,7 @@
   };
 
   const deleteItem = async (itemId: string) => {
+    if (isListCompleted) return;
     if (!window.confirm("Delete this item?")) return;
     error = null;
     try {
@@ -295,7 +306,7 @@
   };
 
   const adjustItemQty = async (item: ItemOut, delta: number) => {
-    if (updatingQtyItemId || editingItemId === item.id) return;
+    if (updatingQtyItemId || editingItemId === item.id || isListCompleted) return;
 
     const currentQty = item.qty ?? 0;
     const nextQty = Math.max(0, currentQty + delta);
@@ -322,6 +333,7 @@
   };
 
   const startEditItem = (item: ItemOut) => {
+    if (isListCompleted) return;
     editingItemId = item.id;
     editName = item.name;
     editQty = item.qty?.toString() ?? "";
@@ -332,7 +344,7 @@
   };
 
   const saveItem = async (itemId: string) => {
-    if (savingItem) return;
+    if (savingItem || isListCompleted) return;
     const name = editName.trim();
     if (!name) return;
     savingItem = true;
@@ -362,6 +374,38 @@
     push("/login");
   };
 
+  const completeCurrentList = async () => {
+    if (!list || completingList || activatingList) return;
+    completingList = true;
+    error = null;
+    try {
+      list = await api.completeList(list.id);
+    } catch (err) {
+      const message = getApiErrorMessage(err, "Complete failed.");
+      if (message) {
+        error = message;
+      }
+    } finally {
+      completingList = false;
+    }
+  };
+
+  const activateCurrentList = async () => {
+    if (!list || activatingList || completingList) return;
+    activatingList = true;
+    error = null;
+    try {
+      list = await api.activateList(list.id);
+    } catch (err) {
+      const message = getApiErrorMessage(err, "Activate failed.");
+      if (message) {
+        error = message;
+      }
+    } finally {
+      activatingList = false;
+    }
+  };
+
   $: if (params.listId && params.listId !== currentListId) {
     currentListId = params.listId;
     loadList(currentListId);
@@ -378,6 +422,7 @@
           type="button"
           aria-label="Edit list name"
           title="Edit name"
+          disabled={isListCompleted}
           on:click={openRenameModal}
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -393,6 +438,9 @@
         Dashboard
       </button>
       <button class="button ghost" on:click={() => push("/lists")}>Lists</button>
+      <button class="button ghost" on:click={() => push("/lists/completed")}>
+        Completed lists
+      </button>
       <button class="button ghost" on:click={() => push("/templates")}>
         Templates
       </button>
@@ -411,7 +459,31 @@
       <div class="row">
         <div>
           <h2>Items</h2>
-          <p class="meta">Add, edit, or tick items as you shop.</p>
+          {#if isListCompleted}
+            <p class="meta">This list is completed and read-only.</p>
+          {:else}
+            <p class="meta">Add, edit, or tick items as you shop.</p>
+          {/if}
+        </div>
+        <div class="toolbar">
+          {#if isListCompleted}
+            <span class="pill">Completed</span>
+            <button
+              class="button"
+              disabled={activatingList || completingList}
+              on:click={activateCurrentList}
+            >
+              Mark active
+            </button>
+          {:else}
+            <button
+              class="button ghost"
+              disabled={activatingList || completingList}
+              on:click={completeCurrentList}
+            >
+              Mark complete
+            </button>
+          {/if}
         </div>
       </div>
 
@@ -423,7 +495,7 @@
             <div
               class="card draggable-item"
               class:drag-over={dragOverItemId === item.id}
-              draggable={editingItemId !== item.id && !reorderingItems}
+              draggable={editingItemId !== item.id && !reorderingItems && !isListCompleted}
               role="listitem"
               aria-grabbed={draggedItemId === item.id}
               on:dragstart={(event) => handleDragStart(event, item.id)}
@@ -480,7 +552,7 @@
                       class="item-checkbox"
                       type="checkbox"
                       checked={item.purchased}
-                      disabled={togglingItemId === item.id}
+                      disabled={togglingItemId === item.id || isListCompleted}
                       aria-label={`Purchased ${item.name}`}
                       on:change={() => toggleItem(item.id)}
                     />
@@ -507,7 +579,7 @@
                       class="button ghost icon-button qty-inline-button"
                       type="button"
                       aria-label={`Increase quantity for ${item.name}`}
-                      disabled={updatingQtyItemId === item.id}
+                      disabled={updatingQtyItemId === item.id || isListCompleted}
                       on:click={() => adjustItemQty(item, 1)}
                     >
                       +
@@ -516,7 +588,11 @@
                       class="button ghost icon-button qty-inline-button"
                       type="button"
                       aria-label={`Decrease quantity for ${item.name}`}
-                      disabled={updatingQtyItemId === item.id || (item.qty ?? 0) <= 1}
+                      disabled={
+                        updatingQtyItemId === item.id ||
+                        (item.qty ?? 0) <= 1 ||
+                        isListCompleted
+                      }
                       on:click={() => adjustItemQty(item, -1)}
                     >
                       -
@@ -525,6 +601,7 @@
                       class="button ghost icon-button"
                       aria-label="Edit"
                       title="Edit"
+                      disabled={isListCompleted}
                       on:click={() => startEditItem(item)}
                     >
                       <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -537,6 +614,7 @@
                       class="button danger icon-button"
                       aria-label="Delete"
                       title="Delete"
+                      disabled={isListCompleted}
                       on:click={() => deleteItem(item.id)}
                     >
                       <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -570,7 +648,7 @@
                   class="item-checkbox"
                   type="checkbox"
                   checked={item.purchased}
-                  disabled={togglingItemId === item.id}
+                  disabled={togglingItemId === item.id || isListCompleted}
                   aria-label={`Purchased ${item.name}`}
                   on:change={() => toggleItem(item.id)}
                 />
@@ -586,6 +664,7 @@
                   class="button danger icon-button"
                   aria-label="Delete"
                   title="Delete"
+                  disabled={isListCompleted}
                   on:click={() => deleteItem(item.id)}
                 >
                   <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -601,7 +680,7 @@
       </section>
     {/if}
 
-    <button class="button floating-add-item" on:click={openAddItemModal}>
+    <button class="button floating-add-item" disabled={isListCompleted} on:click={openAddItemModal}>
       Add item
     </button>
   {/if}

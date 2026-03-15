@@ -9,9 +9,10 @@
     clearToken,
     setAuthNotice,
   } from "./stores/auth";
-import Login from "./routes/Login.svelte";
-import Dashboard from "./routes/Dashboard.svelte";
-import Lists from "./routes/Lists.svelte";
+  import Login from "./routes/Login.svelte";
+  import Dashboard from "./routes/Dashboard.svelte";
+  import Lists from "./routes/Lists.svelte";
+  import CompletedLists from "./routes/CompletedLists.svelte";
   import ListDetail from "./routes/ListDetail.svelte";
   import Templates from "./routes/Templates.svelte";
   import TemplateDetail from "./routes/TemplateDetail.svelte";
@@ -22,6 +23,7 @@ import Lists from "./routes/Lists.svelte";
     "/login": Login,
     "/dashboard": Dashboard,
     "/lists": Lists,
+    "/lists/completed": CompletedLists,
     "/lists/:listId": ListDetail,
     "/templates": Templates,
     "/templates/:templateId": TemplateDetail,

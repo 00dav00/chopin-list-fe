@@ -93,12 +93,21 @@ export const api = {
   getMe: () => fetchJson<UserOut>("/me"),
 
   listLists: () => fetchJson<ListOut[]>("/lists"),
+  listCompletedLists: () => fetchJson<ListOut[]>("/lists/completed"),
   createList: (payload: ListCreate) =>
     fetchJson<ListOut>("/lists", {
       method: "POST",
       body: JSON.stringify(payload),
     }),
   getList: (listId: string) => fetchJson<ListOut>(`/lists/${listId}`),
+  completeList: (listId: string) =>
+    fetchJson<ListOut>(`/lists/${listId}/complete`, {
+      method: "POST",
+    }),
+  activateList: (listId: string) =>
+    fetchJson<ListOut>(`/lists/${listId}/activate`, {
+      method: "POST",
+    }),
   updateList: (listId: string, payload: ListUpdate) =>
     fetchJson<ListOut>(`/lists/${listId}`, {
       method: "PATCH",

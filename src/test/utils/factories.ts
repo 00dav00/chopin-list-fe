@@ -16,6 +16,7 @@ export const makeList = (overrides: ListOverrides = {}): ListOut => ({
   id: "list-1",
   user_id: "user-1",
   name: "Weekly groceries",
+  completed: false,
   template_id: null,
   items_count: 0,
   created_at: "2026-01-01T00:00:00Z",

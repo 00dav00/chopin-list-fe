@@ -11,6 +11,7 @@ export type ListOut = {
   id: string;
   user_id: string;
   name: string;
+  completed: boolean;
   template_id?: string | null;
   items_count: number;
   created_at: string;
@@ -118,7 +119,8 @@ export type DashboardListOut = {
 };
 
 export type DashboardOut = {
-  list_count: number;
+  active_list_count: number;
+  completed_list_count: number;
   templates_count: number;
   last_created_lists: DashboardListOut[];
   last_created_templates: DashboardTemplateOut[];

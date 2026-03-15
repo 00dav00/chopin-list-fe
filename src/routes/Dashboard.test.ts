@@ -21,7 +21,8 @@ describe("Dashboard route", () => {
       vi.fn().mockResolvedValue(
         new Response(
           JSON.stringify({
-            list_count: 3,
+            active_list_count: 3,
+            completed_list_count: 2,
             templates_count: 7,
             last_created_lists: [
               {
@@ -54,6 +55,7 @@ describe("Dashboard route", () => {
     expect(screen.queryByRole("button", { name: "Lists" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Templates" })).toBeNull();
     expect(await screen.findByText("3")).toBeTruthy();
+    expect(await screen.findByText("2 completed")).toBeTruthy();
     expect(await screen.findByText("7")).toBeTruthy();
     expect((await screen.findByRole("link", { name: "Open lists" })).getAttribute("href")).toBe(
       "#/lists"
@@ -96,7 +98,8 @@ describe("Dashboard route", () => {
       vi.fn().mockResolvedValue(
         new Response(
           JSON.stringify({
-            list_count: 0,
+            active_list_count: 0,
+            completed_list_count: 1,
             templates_count: 1,
             last_created_lists: [],
             last_created_templates: [
@@ -126,7 +129,8 @@ describe("Dashboard route", () => {
       vi.fn().mockResolvedValue(
         new Response(
           JSON.stringify({
-            list_count: 1,
+            active_list_count: 1,
+            completed_list_count: 0,
             templates_count: 0,
             last_created_lists: [
               {

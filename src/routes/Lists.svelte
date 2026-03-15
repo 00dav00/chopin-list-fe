@@ -13,6 +13,7 @@
   let creating = false;
   let createListModalOpen = false;
   let deletingId: string | null = null;
+  let updatingStateId: string | null = null;
 
   const formatDate = (value: string) =>
     new Date(value).toLocaleDateString();
@@ -80,6 +81,23 @@
     }
   };
 
+  const completeList = async (listId: string) => {
+    if (updatingStateId) return;
+    updatingStateId = listId;
+    error = null;
+    try {
+      await api.completeList(listId);
+      lists = lists.filter((list) => list.id !== listId);
+    } catch (err) {
+      const message = getApiErrorMessage(err, "Complete failed.");
+      if (message) {
+        error = message;
+      }
+    } finally {
+      updatingStateId = null;
+    }
+  };
+
   const logout = () => {
     clearToken();
     push("/login");
@@ -100,6 +118,9 @@
       </button>
       <button class="button ghost" on:click={() => push("/templates")}>
         Templates
+      </button>
+      <button class="button ghost" on:click={() => push("/lists/completed")}>
+        Completed lists
       </button>
       <button class="button secondary" on:click={logout}>Sign out</button>
     </div>
@@ -135,6 +156,13 @@
             {/if}
           </div>
           <div class="toolbar">
+            <button
+              class="button ghost"
+              disabled={updatingStateId === list.id}
+              on:click={() => completeList(list.id)}
+            >
+              Mark complete
+            </button>
             <button
               class="button icon-button"
               aria-label="Open"
