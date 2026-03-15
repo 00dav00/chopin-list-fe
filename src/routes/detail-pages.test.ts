@@ -448,6 +448,33 @@ describe("ListDetail route specific behavior", () => {
     expect((await screen.findAllByText("Bread")).length).toBeGreaterThan(0);
   });
 
+  it("moves an item to purchased section when checked", async () => {
+    const user = userEvent.setup();
+    apiMock.getList.mockResolvedValue(listBase);
+    apiMock.listItems.mockResolvedValue(listItemsUnsorted);
+    apiMock.toggleItem.mockResolvedValue(
+      makeItem({
+        id: listPrimaryItemId,
+        list_id: listId,
+        name: "Apples",
+        purchased: true,
+        sort_order: 1,
+      })
+    );
+
+    render(ListDetail, { props: { params: { listId } } });
+
+    await user.click(
+      (await screen.findAllByRole("checkbox", {
+        name: "Purchased Apples",
+      }))[0]
+    );
+
+    expect(await screen.findByRole("heading", { name: "Purchased items" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { level: 3, name: "Apples" })).toBeNull();
+    expect(await screen.findByText("Apples")).toBeTruthy();
+  });
+
   it("reorders items and persists the new order", async () => {
     apiMock.getList.mockResolvedValue(listBase);
     apiMock.listItems.mockResolvedValue([
