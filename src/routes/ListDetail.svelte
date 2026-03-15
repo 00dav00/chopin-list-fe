@@ -24,6 +24,7 @@
   let editName = "";
   let editQty = "";
   let savingItem = false;
+  let togglingItemId: string | null = null;
   let updatingQtyItemId: string | null = null;
   let reorderingItems = false;
   let draggedItemId: string | null = null;
@@ -261,6 +262,8 @@
   };
 
   const toggleItem = async (itemId: string) => {
+    if (togglingItemId) return;
+    togglingItemId = itemId;
     error = null;
     try {
       const updated = await api.toggleItem(itemId);
@@ -272,6 +275,8 @@
       if (message) {
         error = message;
       }
+    } finally {
+      togglingItemId = null;
     }
   };
 
@@ -411,13 +416,14 @@
         </div>
 
         <div class="stack">
-          {#each purchasedItems as item}
+          {#each purchasedItems as item (item.id)}
             <div class="card item-row">
               <div class="item-main">
                 <input
                   class="item-checkbox"
                   type="checkbox"
                   checked={item.purchased}
+                  disabled={togglingItemId === item.id}
                   aria-label={`Purchased ${item.name}`}
                   on:change={() => toggleItem(item.id)}
                 />
@@ -460,7 +466,7 @@
         <p class="meta">No items yet.</p>
       {:else}
         <div class="stack">
-          {#each unpurchasedItems as item}
+          {#each unpurchasedItems as item (item.id)}
             <div
               class="card draggable-item"
               class:drag-over={dragOverItemId === item.id}
@@ -521,6 +527,7 @@
                       class="item-checkbox"
                       type="checkbox"
                       checked={item.purchased}
+                      disabled={togglingItemId === item.id}
                       aria-label={`Purchased ${item.name}`}
                       on:change={() => toggleItem(item.id)}
                     />
