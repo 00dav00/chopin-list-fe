@@ -386,7 +386,7 @@
       <button class="button ghost" on:click={() => push("/dashboard")}>
         Dashboard
       </button>
-      <button class="button ghost" on:click={() => push("/lists")}>All lists</button>
+      <button class="button ghost" on:click={() => push("/lists")}>Lists</button>
       <button class="button ghost" on:click={() => push("/templates")}>
         Templates
       </button>
