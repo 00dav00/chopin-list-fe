@@ -3,6 +3,17 @@ export type UserOut = {
   email?: string | null;
   name?: string | null;
   avatar_url?: string | null;
+  admin: boolean;
+  created_at: string;
+  last_login_at?: string | null;
+};
+
+export type PendingUserOut = {
+  id: string;
+  email?: string | null;
+  name?: string | null;
+  avatar_url?: string | null;
+  approved: boolean;
   created_at: string;
   last_login_at?: string | null;
 };

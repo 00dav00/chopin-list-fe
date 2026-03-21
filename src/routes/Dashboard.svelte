@@ -109,6 +109,17 @@
         <h2>Templates</h2>
         <p class="dashboard-value">{summary.templates_count}</p>
       </a>
+
+      {#if $authStore.user?.admin}
+        <a
+          class="card stack dashboard-link-card"
+          href="#/admin/pending-users"
+          aria-label="Open pending user requests"
+        >
+          <h2>Pending users</h2>
+          <p class="meta">Review sign-up approvals</p>
+        </a>
+      {/if}
     </section>
 
     {#if summary.last_created_lists.length > 0}

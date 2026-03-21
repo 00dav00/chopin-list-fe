@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/svelte";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Dashboard from "./Dashboard.svelte";
+import { authStore } from "../stores/auth";
 
 const { pushMock } = vi.hoisted(() => ({
   pushMock: vi.fn(),
@@ -13,6 +14,7 @@ vi.mock("svelte-spa-router", () => ({
 describe("Dashboard route", () => {
   beforeEach(() => {
     pushMock.mockReset();
+    authStore.set({ token: null, expiry: null, user: null, ready: true });
   });
 
   it("loads and renders dashboard summary", async () => {
@@ -152,5 +154,41 @@ describe("Dashboard route", () => {
 
     expect(screen.queryByRole("heading", { name: "Latest templates" })).toBeNull();
     expect(await screen.findByRole("heading", { name: "Latest lists" })).toBeTruthy();
+  });
+
+  it("shows pending-users card for admins", async () => {
+    authStore.set({
+      token: "token",
+      expiry: Date.now() + 10_000,
+      user: {
+        id: "admin-1",
+        email: "admin@example.com",
+        name: "Admin",
+        avatar_url: null,
+        admin: true,
+        created_at: "2026-01-01T00:00:00Z",
+        last_login_at: "2026-01-01T00:00:00Z",
+      },
+      ready: true,
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            active_list_count: 1,
+            completed_list_count: 0,
+            templates_count: 1,
+            last_created_lists: [],
+            last_created_templates: [],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      )
+    );
+
+    render(Dashboard);
+
+    expect(await screen.findByRole("link", { name: "Open pending user requests" })).toBeTruthy();
   });
 });

@@ -43,7 +43,7 @@ describe("auth store", () => {
     authModule.authStore.set({
       token: "token-abc",
       expiry: 12_000,
-      user: { id: "user-1", created_at: "2026-01-01T00:00:00Z" },
+      user: { id: "user-1", admin: false, created_at: "2026-01-01T00:00:00Z" },
       ready: false,
     });
     localStorage.setItem("auth_token", "token-abc");
@@ -100,7 +100,7 @@ describe("auth store", () => {
     vi.spyOn(Date, "now").mockReturnValue(5_000);
     localStorage.setItem("auth_token", "token-abc");
     localStorage.setItem("auth_expiry", "15000");
-    const user = { id: "user-1", created_at: "2026-01-01T00:00:00Z" };
+    const user = { id: "user-1", admin: false, created_at: "2026-01-01T00:00:00Z" };
     vi.spyOn(apiModule.api, "getMe").mockResolvedValue(user);
 
     await authModule.bootstrapAuth();

@@ -14,6 +14,7 @@ import type {
   TemplateItemCreate,
   TemplateItemUpdate,
   CreateListFromTemplate,
+  PendingUserOut,
 } from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
@@ -183,4 +184,7 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+
+  listPendingUsers: () =>
+    fetchJson<PendingUserOut[]>("/me/admin/pending-users"),
 };
