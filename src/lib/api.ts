@@ -187,4 +187,8 @@ export const api = {
 
   listPendingUsers: () =>
     fetchJson<PendingUserOut[]>("/me/admin/pending-users"),
+  approveUser: (userId: string) =>
+    fetchJson<PendingUserOut>(`/me/admin/users/${userId}/approve`, {
+      method: "POST",
+    }),
 };

@@ -9,6 +9,7 @@
   let pendingUsers: PendingUserOut[] = [];
   let loading = true;
   let error: string | null = null;
+  let approvingId: string | null = null;
 
   const formatDate = (value: string) => new Date(value).toLocaleDateString();
 
@@ -35,6 +36,23 @@
   const logout = () => {
     clearToken();
     push("/login");
+  };
+
+  const approveUser = async (userId: string) => {
+    if (approvingId) return;
+    approvingId = userId;
+    error = null;
+    try {
+      await api.approveUser(userId);
+      pendingUsers = pendingUsers.filter((user) => user.id !== userId);
+    } catch (err) {
+      const message = getApiErrorMessage(err, "Approve failed.");
+      if (message) {
+        error = message;
+      }
+    } finally {
+      approvingId = null;
+    }
   };
 
   onMount(loadPendingUsers);
@@ -70,6 +88,15 @@
           <h2>{user.name || user.email || "Unnamed user"}</h2>
           <p class="meta">{user.email || "No email"}</p>
           <p class="meta">Requested {formatDate(user.created_at)}</p>
+          <div class="toolbar">
+            <button
+              class="button"
+              disabled={approvingId === user.id}
+              on:click={() => approveUser(user.id)}
+            >
+              {approvingId === user.id ? "Approving..." : "Approve"}
+            </button>
+          </div>
         </article>
       {/each}
     </section>
