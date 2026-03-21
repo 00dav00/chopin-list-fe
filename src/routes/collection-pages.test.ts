@@ -338,4 +338,22 @@ describe("Completed list lifecycle routes", () => {
     render(Lists);
     expect(await screen.findByRole("button", { name: "Active users" })).toBeTruthy();
   });
+
+  it("shows updated list index actions and routes from header", async () => {
+    const user = userEvent.setup();
+    apiMock.listLists.mockResolvedValue([]);
+
+    render(Lists);
+
+    const addListButton = await screen.findByRole("button", { name: "Add list" });
+    expect(addListButton.className).toContain("floating-add-item");
+    expect(screen.getByRole("button", { name: "Completed lists" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Create from template" })).toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: "Completed lists" }));
+    expect(pushMock).toHaveBeenCalledWith("/lists/completed");
+
+    await user.click(screen.getByRole("button", { name: "Create from template" }));
+    expect(pushMock).toHaveBeenCalledWith("/templates");
+  });
 });
