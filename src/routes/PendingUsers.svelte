@@ -10,6 +10,7 @@
   let loading = true;
   let error: string | null = null;
   let approvingId: string | null = null;
+  let deletingId: string | null = null;
 
   const formatDate = (value: string) => new Date(value).toLocaleDateString();
 
@@ -39,7 +40,7 @@
   };
 
   const approveUser = async (userId: string) => {
-    if (approvingId) return;
+    if (approvingId || deletingId) return;
     approvingId = userId;
     error = null;
     try {
@@ -55,6 +56,24 @@
     }
   };
 
+  const deletePendingUser = async (userId: string) => {
+    if (approvingId || deletingId) return;
+    if (!window.confirm("Delete this pending user and all their data?")) return;
+    deletingId = userId;
+    error = null;
+    try {
+      await api.deletePendingUser(userId);
+      pendingUsers = pendingUsers.filter((user) => user.id !== userId);
+    } catch (err) {
+      const message = getApiErrorMessage(err, "Delete failed.");
+      if (message) {
+        error = message;
+      }
+    } finally {
+      deletingId = null;
+    }
+  };
+
   onMount(loadPendingUsers);
 </script>
 
@@ -65,6 +84,9 @@
       <p>Review users waiting for admin confirmation.</p>
     </div>
     <div class="nav-links">
+      <button class="button ghost" on:click={() => push("/admin/active-users")}>
+        Active users
+      </button>
       <button class="button ghost" on:click={() => push("/dashboard")}>
         Dashboard
       </button>
@@ -82,19 +104,27 @@
       <p>All user requests are already handled.</p>
     </section>
   {:else}
-    <section class="list-grid">
+    <section class="card stack">
       {#each pendingUsers as user}
-        <article class="card stack">
-          <h2>{user.name || user.email || "Unnamed user"}</h2>
-          <p class="meta">{user.email || "No email"}</p>
-          <p class="meta">Requested {formatDate(user.created_at)}</p>
+        <article class="pending-user-row">
+          <p class="meta pending-user-main">
+            <strong>{user.name || "Unnamed user"}</strong>
+            - {user.email || "No email"} - requested {formatDate(user.created_at)}
+          </p>
           <div class="toolbar">
             <button
               class="button"
-              disabled={approvingId === user.id}
+              disabled={approvingId === user.id || deletingId === user.id}
               on:click={() => approveUser(user.id)}
             >
               {approvingId === user.id ? "Approving..." : "Approve"}
+            </button>
+            <button
+              class="button danger"
+              disabled={approvingId === user.id || deletingId === user.id}
+              on:click={() => deletePendingUser(user.id)}
+            >
+              {deletingId === user.id ? "Deleting..." : "Delete"}
             </button>
           </div>
         </article>

@@ -4,7 +4,7 @@
   import { api } from "../lib/api";
   import { getApiErrorMessage } from "../lib/errors";
   import type { ListOut } from "../lib/types";
-  import { clearToken } from "../stores/auth";
+  import { authStore, clearToken } from "../stores/auth";
 
   let lists: ListOut[] = [];
   let loading = true;
@@ -119,19 +119,18 @@
       <button class="button ghost" on:click={() => push("/templates")}>
         Templates
       </button>
-      <button class="button ghost" on:click={() => push("/lists/completed")}>
-        Completed lists
-      </button>
+      {#if $authStore.user?.admin}
+        <button class="button ghost" on:click={() => push("/admin/active-users")}>
+          Active users
+        </button>
+      {/if}
       <button class="button secondary" on:click={logout}>Sign out</button>
     </div>
   </header>
 
-  <section class="card stack">
-    <div class="toolbar">
-      <button class="button ghost" on:click={() => push("/templates")}>
-        Create from template
-      </button>
-    </div>
+  <section class="toolbar">
+    <button class="button" on:click={openCreateListModal}>Add list</button>
+    <button class="button ghost" on:click={() => push("/templates")}>Create from template</button>
   </section>
 
   {#if loading}
@@ -146,7 +145,18 @@
   {:else}
     <section class="list-grid">
       {#each lists as list}
-        <article class="card item-row">
+        <div
+          class="card item-row card-clickable"
+          role="button"
+          tabindex="0"
+          on:click={() => push(`/lists/${list.id}`)}
+          on:keydown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              push(`/lists/${list.id}`);
+            }
+          }}
+        >
           <div>
             <h2>{list.name}</h2>
             <p class="meta">Updated {formatDate(list.updated_at)}</p>
@@ -156,47 +166,32 @@
             {/if}
           </div>
           <div class="toolbar">
-            <button
-              class="button ghost"
-              disabled={updatingStateId === list.id}
-              on:click={() => completeList(list.id)}
-            >
-              Mark complete
-            </button>
-            <button
-              class="button icon-button"
-              aria-label="Open"
-              title="Open"
-              on:click={() => push(`/lists/${list.id}`)}
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm14.71-9.04a1.003 1.003 0 0 0 0-1.42l-2.5-2.5a1.003 1.003 0 0 0-1.42 0l-1.79 1.79 3.75 3.75 1.96-1.62z"
-                />
-              </svg>
-            </button>
-            <button
-              class="button danger icon-button"
-              aria-label="Delete"
-              title="Delete"
-              disabled={deletingId === list.id}
-              on:click={() => deleteList(list.id)}
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
+              <button
+                class="button ghost"
+                disabled={updatingStateId === list.id}
+                on:click|stopPropagation={() => completeList(list.id)}
+              >
+                Mark complete
+              </button>
+              <button
+                class="button danger icon-button"
+                aria-label="Delete"
+                title="Delete"
+                disabled={deletingId === list.id}
+                on:click|stopPropagation={() => deleteList(list.id)}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path
                   d="M9 3h6l1 2h4v2H4V5h4l1-2zm-2 6h2v9H7V9zm4 0h2v9h-2V9zm4 0h2v9h-2V9zM6 21h12l1-14H5l1 14z"
                 />
               </svg>
             </button>
           </div>
-        </article>
+        </div>
       {/each}
     </section>
   {/if}
 
-  <button class="button floating-add-item" on:click={openCreateListModal}>
-    Add list
-  </button>
 </main>
 
 {#if createListModalOpen}

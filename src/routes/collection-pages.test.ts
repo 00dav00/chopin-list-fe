@@ -6,6 +6,7 @@ import CompletedLists from "./CompletedLists.svelte";
 import Templates from "./Templates.svelte";
 import type { ListOut, TemplateOut } from "../lib/types";
 import { makeList, makeTemplate, makeTemplateDetail } from "../test/utils/factories";
+import { authStore } from "../stores/auth";
 
 const { pushMock, apiMock, TestApiError } = vi.hoisted(() => ({
   pushMock: vi.fn(),
@@ -114,6 +115,7 @@ describe.each(collectionConfigs)("$name route", (config) => {
   beforeEach(() => {
     resetApiMocks();
     pushMock.mockReset();
+    authStore.set({ token: "token", expiry: Date.now() + 10_000, user: null, ready: true });
     vi.spyOn(window, "confirm").mockReturnValue(true);
   });
 
@@ -203,6 +205,7 @@ describe("Templates route specific behavior", () => {
   beforeEach(() => {
     resetApiMocks();
     pushMock.mockReset();
+    authStore.set({ token: "token", expiry: Date.now() + 10_000, user: null, ready: true });
   });
 
   it("creates a list directly from a template", async () => {
@@ -233,12 +236,27 @@ describe("Templates route specific behavior", () => {
     });
     expect(pushMock).toHaveBeenCalledWith("/lists/list-from-template");
   });
+
+  it("opens template detail when clicking template card", async () => {
+    const user = userEvent.setup();
+    const template = makeTemplate({
+      id: "template-1",
+      name: "Weekly prep",
+    });
+    apiMock.listTemplates.mockResolvedValue([template]);
+
+    render(Templates);
+
+    await user.click(await screen.findByText("Weekly prep"));
+    expect(pushMock).toHaveBeenCalledWith("/templates/template-1");
+  });
 });
 
 describe("Completed list lifecycle routes", () => {
   beforeEach(() => {
     resetApiMocks();
     pushMock.mockReset();
+    authStore.set({ token: "token", expiry: Date.now() + 10_000, user: null, ready: true });
   });
 
   it("marks an active list complete from Lists page", async () => {
@@ -258,6 +276,17 @@ describe("Completed list lifecycle routes", () => {
     await waitFor(() => {
       expect(screen.queryByText("Errands")).toBeNull();
     });
+  });
+
+  it("opens list detail when clicking list card", async () => {
+    const user = userEvent.setup();
+    const active = makeList({ id: "list-active", name: "Errands", completed: false });
+    apiMock.listLists.mockResolvedValue([active]);
+
+    render(Lists);
+
+    await user.click(await screen.findByText("Errands"));
+    expect(pushMock).toHaveBeenCalledWith("/lists/list-active");
   });
 
   it("loads completed lists and marks one active", async () => {
@@ -281,5 +310,32 @@ describe("Completed list lifecycle routes", () => {
     await waitFor(() => {
       expect(screen.queryByText("Finished run")).toBeNull();
     });
+  });
+
+  it("shows active users nav item only for admin", async () => {
+    apiMock.listLists.mockResolvedValue([]);
+    authStore.set({ token: "token", expiry: Date.now() + 10_000, user: null, ready: true });
+
+    const { unmount } = render(Lists);
+    expect(screen.queryByRole("button", { name: "Active users" })).toBeNull();
+    unmount();
+
+    authStore.set({
+      token: "token",
+      expiry: Date.now() + 10_000,
+      user: {
+        id: "admin-1",
+        email: "admin@example.com",
+        name: "Admin",
+        avatar_url: null,
+        admin: true,
+        created_at: "2026-01-01T00:00:00Z",
+        last_login_at: "2026-01-01T00:00:00Z",
+      },
+      ready: true,
+    });
+
+    render(Lists);
+    expect(await screen.findByRole("button", { name: "Active users" })).toBeTruthy();
   });
 });

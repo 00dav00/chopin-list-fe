@@ -18,6 +18,16 @@ export type PendingUserOut = {
   last_login_at?: string | null;
 };
 
+export type ConfirmedUserOut = {
+  id: string;
+  email?: string | null;
+  name?: string | null;
+  avatar_url?: string | null;
+  approved: boolean;
+  created_at: string;
+  last_login_at?: string | null;
+};
+
 export type ListOut = {
   id: string;
   user_id: string;
@@ -133,6 +143,8 @@ export type DashboardOut = {
   active_list_count: number;
   completed_list_count: number;
   templates_count: number;
+  confirmed_users_count?: number | null;
+  pending_users_count?: number | null;
   last_created_lists: DashboardListOut[];
   last_created_templates: DashboardTemplateOut[];
 };

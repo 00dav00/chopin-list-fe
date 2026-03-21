@@ -3,7 +3,7 @@
   import { api } from "../lib/api";
   import { getApiErrorMessage } from "../lib/errors";
   import type { ItemOut, ListOut } from "../lib/types";
-  import { clearToken } from "../stores/auth";
+  import { authStore, clearToken } from "../stores/auth";
 
   export let params: { listId?: string } = {};
 
@@ -438,12 +438,14 @@
         Dashboard
       </button>
       <button class="button ghost" on:click={() => push("/lists")}>Lists</button>
-      <button class="button ghost" on:click={() => push("/lists/completed")}>
-        Completed lists
-      </button>
       <button class="button ghost" on:click={() => push("/templates")}>
         Templates
       </button>
+      {#if $authStore.user?.admin}
+        <button class="button ghost" on:click={() => push("/admin/active-users")}>
+          Active users
+        </button>
+      {/if}
       <button class="button secondary" on:click={logout}>Sign out</button>
     </div>
   </header>

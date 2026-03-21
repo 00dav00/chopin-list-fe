@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/svelte";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import PendingUsers from "./PendingUsers.svelte";
 import { authStore } from "../stores/auth";
@@ -8,6 +9,7 @@ const { pushMock, apiMock, TestApiError } = vi.hoisted(() => ({
   apiMock: {
     listPendingUsers: vi.fn(),
     approveUser: vi.fn(),
+    deletePendingUser: vi.fn(),
   },
   TestApiError: class extends Error {
     status: number;
@@ -36,6 +38,8 @@ describe("PendingUsers route", () => {
     pushMock.mockReset();
     apiMock.listPendingUsers.mockReset();
     apiMock.approveUser.mockReset();
+    apiMock.deletePendingUser.mockReset();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
   });
 
   it("redirects non-admin users to dashboard", async () => {
@@ -79,7 +83,7 @@ describe("PendingUsers route", () => {
     render(PendingUsers);
 
     expect(await screen.findByText("Pending User")).toBeTruthy();
-    expect(screen.getByText("pending@example.com")).toBeTruthy();
+    expect(screen.getByText(/pending@example.com/)).toBeTruthy();
     expect(apiMock.listPendingUsers).toHaveBeenCalledTimes(1);
   });
 
@@ -108,6 +112,7 @@ describe("PendingUsers route", () => {
   });
 
   it("approves a pending user and removes it from the list", async () => {
+    const user = userEvent.setup();
     authStore.set({
       token: "token",
       expiry: Date.now() + 10_000,
@@ -146,10 +151,51 @@ describe("PendingUsers route", () => {
     render(PendingUsers);
 
     const approveButton = await screen.findByRole("button", { name: "Approve" });
-    await approveButton.click();
+    await user.click(approveButton);
 
     await waitFor(() => {
       expect(apiMock.approveUser).toHaveBeenCalledWith("pending-1");
+    });
+    await waitFor(() => {
+      expect(screen.queryByText("Pending User")).toBeNull();
+    });
+  });
+
+  it("deletes a pending user and removes it from the list", async () => {
+    const user = userEvent.setup();
+    authStore.set({
+      token: "token",
+      expiry: Date.now() + 10_000,
+      user: {
+        id: "admin-1",
+        email: "admin@example.com",
+        name: "Admin",
+        avatar_url: null,
+        admin: true,
+        created_at: "2026-01-01T00:00:00Z",
+        last_login_at: "2026-01-01T00:00:00Z",
+      },
+      ready: true,
+    });
+    apiMock.listPendingUsers.mockResolvedValue([
+      {
+        id: "pending-1",
+        email: "pending@example.com",
+        name: "Pending User",
+        avatar_url: null,
+        approved: false,
+        created_at: "2026-01-03T00:00:00Z",
+        last_login_at: null,
+      },
+    ]);
+    apiMock.deletePendingUser.mockResolvedValue(null);
+
+    render(PendingUsers);
+
+    await user.click(await screen.findByRole("button", { name: "Delete" }));
+
+    await waitFor(() => {
+      expect(apiMock.deletePendingUser).toHaveBeenCalledWith("pending-1");
     });
     await waitFor(() => {
       expect(screen.queryByText("Pending User")).toBeNull();

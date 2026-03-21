@@ -4,7 +4,7 @@
   import { api } from "../lib/api";
   import { getApiErrorMessage } from "../lib/errors";
   import type { ListOut } from "../lib/types";
-  import { clearToken } from "../stores/auth";
+  import { authStore, clearToken } from "../stores/auth";
 
   let lists: ListOut[] = [];
   let loading = true;
@@ -63,6 +63,11 @@
       <button class="button ghost" on:click={() => push("/dashboard")}>Dashboard</button>
       <button class="button ghost" on:click={() => push("/lists")}>Active lists</button>
       <button class="button ghost" on:click={() => push("/templates")}>Templates</button>
+      {#if $authStore.user?.admin}
+        <button class="button ghost" on:click={() => push("/admin/active-users")}>
+          Active users
+        </button>
+      {/if}
       <button class="button secondary" on:click={logout}>Sign out</button>
     </div>
   </header>

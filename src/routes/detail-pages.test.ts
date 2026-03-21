@@ -676,8 +676,9 @@ describe("TemplateDetail route specific behavior", () => {
 
     render(TemplateDetail, { props: { params: { templateId } } });
 
+    await user.click(await screen.findByRole("button", { name: "Create list" }));
     await user.type(await screen.findByPlaceholderText("Optional list name"), "Weekend prep");
-    await user.click(screen.getByRole("button", { name: "Create list" }));
+    await user.click(screen.getAllByRole("button", { name: "Create list" })[1]);
 
     await waitFor(() => {
       expect(apiMock.createListFromTemplate).toHaveBeenCalledWith(templateId, {

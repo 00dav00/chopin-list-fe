@@ -26,6 +26,8 @@ describe("Dashboard route", () => {
             active_list_count: 3,
             completed_list_count: 2,
             templates_count: 7,
+            confirmed_users_count: null,
+            pending_users_count: null,
             last_created_lists: [
               {
                 id: "list-1",
@@ -103,6 +105,8 @@ describe("Dashboard route", () => {
             active_list_count: 0,
             completed_list_count: 1,
             templates_count: 1,
+            confirmed_users_count: null,
+            pending_users_count: null,
             last_created_lists: [],
             last_created_templates: [
               {
@@ -134,6 +138,8 @@ describe("Dashboard route", () => {
             active_list_count: 1,
             completed_list_count: 0,
             templates_count: 0,
+            confirmed_users_count: null,
+            pending_users_count: null,
             last_created_lists: [
               {
                 id: "list-1",
@@ -156,7 +162,7 @@ describe("Dashboard route", () => {
     expect(await screen.findByRole("heading", { name: "Latest lists" })).toBeTruthy();
   });
 
-  it("shows pending-users card for admins", async () => {
+  it("shows active-users card for admins with active and pending counts", async () => {
     authStore.set({
       token: "token",
       expiry: Date.now() + 10_000,
@@ -179,6 +185,8 @@ describe("Dashboard route", () => {
             active_list_count: 1,
             completed_list_count: 0,
             templates_count: 1,
+            confirmed_users_count: 5,
+            pending_users_count: 2,
             last_created_lists: [],
             last_created_templates: [],
           }),
@@ -189,6 +197,9 @@ describe("Dashboard route", () => {
 
     render(Dashboard);
 
-    expect(await screen.findByRole("link", { name: "Open pending user requests" })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Active users" })).toBeTruthy();
+    expect(await screen.findByRole("link", { name: "Open active users" })).toBeTruthy();
+    expect(await screen.findByText("5 active users")).toBeTruthy();
+    expect(await screen.findByText("2 pending users")).toBeTruthy();
   });
 });

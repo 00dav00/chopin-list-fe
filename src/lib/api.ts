@@ -15,6 +15,7 @@ import type {
   TemplateItemUpdate,
   CreateListFromTemplate,
   PendingUserOut,
+  ConfirmedUserOut,
 } from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
@@ -187,8 +188,18 @@ export const api = {
 
   listPendingUsers: () =>
     fetchJson<PendingUserOut[]>("/me/admin/pending-users"),
+  listConfirmedUsers: () =>
+    fetchJson<ConfirmedUserOut[]>("/me/admin/confirmed-users"),
   approveUser: (userId: string) =>
     fetchJson<PendingUserOut>(`/me/admin/users/${userId}/approve`, {
       method: "POST",
+    }),
+  unconfirmUser: (userId: string) =>
+    fetchJson<ConfirmedUserOut>(`/me/admin/users/${userId}/unconfirm`, {
+      method: "POST",
+    }),
+  deletePendingUser: (userId: string) =>
+    fetchJson<null>(`/me/admin/users/${userId}`, {
+      method: "DELETE",
     }),
 };

@@ -154,4 +154,23 @@ describe("api client", () => {
     expect(fetchMock.mock.calls[1]?.[0]).toContain("/lists/list-42/complete");
     expect(fetchMock.mock.calls[2]?.[0]).toContain("/lists/list-42/activate");
   });
+
+  it("hits admin user management endpoints", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response("[]", { status: 200 }))
+      .mockResolvedValueOnce(new Response("{}", { status: 200 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const apiModule = await import("./api");
+    await apiModule.api.listConfirmedUsers();
+    await apiModule.api.unconfirmUser("user-7");
+    await apiModule.api.deletePendingUser("user-8");
+
+    expect(fetchMock.mock.calls[0]?.[0]).toContain("/me/admin/confirmed-users");
+    expect(fetchMock.mock.calls[1]?.[0]).toContain("/me/admin/users/user-7/unconfirm");
+    expect(fetchMock.mock.calls[2]?.[0]).toContain("/me/admin/users/user-8");
+    expect((fetchMock.mock.calls[2]?.[1] as RequestInit).method).toBe("DELETE");
+  });
 });

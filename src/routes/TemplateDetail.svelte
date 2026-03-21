@@ -3,7 +3,7 @@
   import { api } from "../lib/api";
   import { getApiErrorMessage } from "../lib/errors";
   import type { TemplateDetailOut, TemplateItemOut } from "../lib/types";
-  import { clearToken } from "../stores/auth";
+  import { authStore, clearToken } from "../stores/auth";
 
   export let params: { templateId?: string } = {};
 
@@ -28,6 +28,7 @@
 
   let createListName = "";
   let creatingList = false;
+  let createListModalOpen = false;
 
   let currentTemplateId = "";
 
@@ -249,6 +250,7 @@
     try {
       const payload = { name: createListName.trim() || null };
       const created = await api.createListFromTemplate(template.id, payload);
+      createListModalOpen = false;
       push(`/lists/${created.id}`);
     } catch (err) {
       const message = getApiErrorMessage(err, "Create failed.");
@@ -263,6 +265,16 @@
   const logout = () => {
     clearToken();
     push("/login");
+  };
+
+  const openCreateListModal = () => {
+    createListName = "";
+    createListModalOpen = true;
+  };
+
+  const closeCreateListModal = () => {
+    if (creatingList) return;
+    createListModalOpen = false;
   };
 
   $: if (params.templateId && params.templateId !== currentTemplateId) {
@@ -300,6 +312,11 @@
       <button class="button ghost" on:click={() => push("/templates")}>
         Templates
       </button>
+      {#if $authStore.user?.admin}
+        <button class="button ghost" on:click={() => push("/admin/active-users")}>
+          Active users
+        </button>
+      {/if}
       <button class="button secondary" on:click={logout}>Sign out</button>
     </div>
   </header>
@@ -312,27 +329,13 @@
     <p class="meta">Template not found.</p>
   {:else}
     <section class="card stack">
-      <div>
-        <h2>Create list from template</h2>
-        <p class="meta">Spin up a list with these items in one tap.</p>
-      </div>
-      <div class="toolbar">
-        <input
-          class="input"
-          placeholder="Optional list name"
-          bind:value={createListName}
-        />
-        <button class="button" disabled={creatingList} on:click={createListFromTemplate}>
-          {creatingList ? "Creating..." : "Create list"}
-        </button>
-      </div>
-    </section>
-
-    <section class="card stack">
       <div class="row">
         <div>
           <h2>Template items</h2>
           <p class="meta">Add the staples you always buy.</p>
+        </div>
+        <div class="toolbar">
+          <button class="button" on:click={openCreateListModal}>Create list</button>
         </div>
       </div>
 
@@ -497,6 +500,29 @@
         </button>
         <button class="button" disabled={creatingItem} on:click={createTemplateItem}>
           {creatingItem ? "Creating..." : "Create item"}
+        </button>
+      </div>
+    </section>
+  </div>
+{/if}
+
+{#if createListModalOpen}
+  <div class="modal-backdrop" role="presentation" on:click|self={closeCreateListModal}>
+    <section
+      class="modal card stack"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="create-list-from-template-title"
+    >
+      <h3 id="create-list-from-template-title">Create list from template</h3>
+      <p class="meta">Template: {template?.name ?? "Template"}</p>
+      <input class="input" placeholder="Optional list name" bind:value={createListName} />
+      <div class="toolbar">
+        <button class="button ghost" disabled={creatingList} on:click={closeCreateListModal}>
+          Cancel
+        </button>
+        <button class="button" disabled={creatingList} on:click={createListFromTemplate}>
+          {creatingList ? "Creating..." : "Create list"}
         </button>
       </div>
     </section>

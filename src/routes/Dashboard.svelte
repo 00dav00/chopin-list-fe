@@ -84,6 +84,11 @@
       <h1>Chopin list</h1>
     </div>
     <div class="nav-links">
+      {#if $authStore.user?.admin}
+        <button class="button ghost" on:click={() => push("/admin/active-users")}>
+          Active users
+        </button>
+      {/if}
       <button class="button secondary" on:click={logout}>Sign out</button>
     </div>
   </header>
@@ -113,11 +118,12 @@
       {#if $authStore.user?.admin}
         <a
           class="card stack dashboard-link-card"
-          href="#/admin/pending-users"
-          aria-label="Open pending user requests"
+          href="#/admin/active-users"
+          aria-label="Open active users"
         >
-          <h2>Pending users</h2>
-          <p class="meta">Review sign-up approvals</p>
+          <h2>Users</h2>
+          <p class="dashboard-value">{summary.confirmed_users_count ?? 0} active users</p>
+          <p class="dashboard-subvalue">{summary.pending_users_count ?? 0} pending users</p>
         </a>
       {/if}
     </section>

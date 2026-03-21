@@ -17,6 +17,7 @@
   import Templates from "./routes/Templates.svelte";
   import TemplateDetail from "./routes/TemplateDetail.svelte";
   import PendingUsers from "./routes/PendingUsers.svelte";
+  import ActiveUsers from "./routes/ActiveUsers.svelte";
   import NotFound from "./routes/NotFound.svelte";
 
   const routes = {
@@ -29,6 +30,7 @@
     "/templates": Templates,
     "/templates/:templateId": TemplateDetail,
     "/admin/pending-users": PendingUsers,
+    "/admin/active-users": ActiveUsers,
     "*": NotFound,
   };
 
