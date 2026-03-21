@@ -119,6 +119,12 @@
       <button class="button ghost" on:click={() => push("/templates")}>
         Templates
       </button>
+      <button class="button ghost" on:click={() => push("/lists/completed")}>
+        Completed lists
+      </button>
+      <button class="button ghost" on:click={() => push("/templates")}>
+        Create from template
+      </button>
       {#if $authStore.user?.admin}
         <button class="button ghost" on:click={() => push("/admin/active-users")}>
           Active users
@@ -127,11 +133,6 @@
       <button class="button secondary" on:click={logout}>Sign out</button>
     </div>
   </header>
-
-  <section class="toolbar">
-    <button class="button" on:click={openCreateListModal}>Add list</button>
-    <button class="button ghost" on:click={() => push("/templates")}>Create from template</button>
-  </section>
 
   {#if loading}
     <p class="meta">Loading lists...</p>
@@ -191,6 +192,8 @@
       {/each}
     </section>
   {/if}
+
+  <button class="button floating-add-item" on:click={openCreateListModal}>Add list</button>
 
 </main>
 
