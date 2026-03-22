@@ -296,6 +296,19 @@
             />
           </svg>
         </button>
+        <button
+          class="button ghost icon-button"
+          type="button"
+          aria-label="Create list from template"
+          title="Create list from template"
+          on:click={openCreateListModal}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M12 3.25 13.9 8.1l4.85 1.9-4.85 1.9L12 16.75l-1.9-4.85-4.85-1.9 4.85-1.9L12 3.25zm7.25 10.5.95 2.4 2.4.95-2.4.95-.95 2.4-.95-2.4-2.4-.95 2.4-.95.95-2.4zM4.75 13.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7.7-1.8z"
+            />
+          </svg>
+        </button>
         <h1>{template ? template.name : "Template"}</h1>
       </div>
     </div>
@@ -317,11 +330,8 @@
     <section class="card stack">
       <div class="row">
         <div>
-          <h2>Template items</h2>
+          <h2>Template items ({items.length})</h2>
           <p class="meta">Add the staples you always buy.</p>
-        </div>
-        <div class="toolbar">
-          <button class="button" on:click={openCreateListModal}>Create list</button>
         </div>
       </div>
 

@@ -609,6 +609,30 @@ describe("ListDetail route specific behavior", () => {
     });
   });
 
+  it("shows purchased to total count beside items heading", async () => {
+    apiMock.getList.mockResolvedValue(listBase);
+    apiMock.listItems.mockResolvedValue([
+      makeItem({
+        id: listPrimaryItemId,
+        list_id: listId,
+        name: "Apples",
+        purchased: true,
+        sort_order: 1,
+      }),
+      makeItem({
+        id: "list-item-2",
+        list_id: listId,
+        name: "Bananas",
+        purchased: false,
+        sort_order: 2,
+      }),
+    ]);
+
+    render(ListDetail, { props: { params: { listId } } });
+
+    expect(await screen.findByRole("heading", { name: "Items (1/2)" })).toBeTruthy();
+  });
+
   it("disables list row decrease button when quantity is one", async () => {
     apiMock.getList.mockResolvedValue(listBase);
     apiMock.listItems.mockResolvedValue([
@@ -676,9 +700,9 @@ describe("TemplateDetail route specific behavior", () => {
 
     render(TemplateDetail, { props: { params: { templateId } } });
 
-    await user.click(await screen.findByRole("button", { name: "Create list" }));
+    await user.click(await screen.findByRole("button", { name: "Create list from template" }));
     await user.type(await screen.findByPlaceholderText("Optional list name"), "Weekend prep");
-    await user.click(screen.getAllByRole("button", { name: "Create list" })[1]);
+    await user.click(screen.getByRole("button", { name: "Create list" }));
 
     await waitFor(() => {
       expect(apiMock.createListFromTemplate).toHaveBeenCalledWith(templateId, {
@@ -686,6 +710,19 @@ describe("TemplateDetail route specific behavior", () => {
       });
     });
     expect(pushMock).toHaveBeenCalledWith("/lists/list-from-template");
+  });
+
+  it("shows template item count beside heading", async () => {
+    apiMock.getTemplate.mockResolvedValue(
+      makeTemplateDetail({
+        ...templateBase,
+        items: templateItemsUnsorted,
+      })
+    );
+
+    render(TemplateDetail, { props: { params: { templateId } } });
+
+    expect(await screen.findByRole("heading", { name: "Template items (2)" })).toBeTruthy();
   });
 
   it("adjusts template item quantity from item row controls", async () => {

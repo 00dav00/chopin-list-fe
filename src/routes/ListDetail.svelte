@@ -446,7 +446,7 @@
     <section class="card stack">
       <div class="row">
         <div>
-          <h2>Items</h2>
+          <h2>Items ({purchasedItems.length}/{items.length})</h2>
           {#if isListCompleted}
             <p class="meta">This list is completed and read-only.</p>
           {:else}

@@ -165,11 +165,13 @@
             <button
               class="button icon-button"
               aria-label="Create list from template"
-              title="Create list"
+              title="Create list from template"
               on:click|stopPropagation={() => openCreateListModal(template)}
             >
               <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M5 20h14v-2H5v2zm7-16-5 5h3v6h4V9h3l-5-5z" />
+                <path
+                  d="M12 3.25 13.9 8.1l4.85 1.9-4.85 1.9L12 16.75l-1.9-4.85-4.85-1.9 4.85-1.9L12 3.25zm7.25 10.5.95 2.4 2.4.95-2.4.95-.95 2.4-.95-2.4-2.4-.95 2.4-.95.95-2.4zM4.75 13.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7.7-1.8z"
+                />
               </svg>
             </button>
             <button
