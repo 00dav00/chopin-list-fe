@@ -10,6 +10,7 @@ import {
   makeTemplateDetail,
   makeTemplateItem,
 } from "../test/utils/factories";
+import { authStore } from "../stores/auth";
 
 const { pushMock, apiMock, TestApiError } = vi.hoisted(() => ({
   pushMock: vi.fn(),
@@ -394,6 +395,46 @@ describe("ListDetail route specific behavior", () => {
     resetApiMocks();
     pushMock.mockReset();
     vi.spyOn(window, "confirm").mockReturnValue(true);
+    authStore.set({ token: null, expiry: null, user: null, ready: true });
+  });
+
+  it("shows new experience link for admins and navigates", async () => {
+    const user = userEvent.setup();
+    authStore.set({
+      token: "token",
+      expiry: Date.now() + 10_000,
+      user: {
+        id: "admin-1",
+        email: "admin@example.com",
+        name: "Admin",
+        avatar_url: null,
+        admin: true,
+        created_at: "2026-01-01T00:00:00Z",
+        last_login_at: "2026-01-01T00:00:00Z",
+      },
+      ready: true,
+    });
+    apiMock.getList.mockResolvedValue(listBase);
+    apiMock.listItems.mockResolvedValue(listItemsUnsorted);
+
+    render(ListDetail, { props: { params: { listId } } });
+
+    const newExperience = await screen.findByRole("button", {
+      name: "New experience",
+    });
+    await user.click(newExperience);
+
+    expect(pushMock).toHaveBeenCalledWith(`/lists/${listId}/live`);
+  });
+
+  it("hides new experience link for non-admin users", async () => {
+    apiMock.getList.mockResolvedValue(listBase);
+    apiMock.listItems.mockResolvedValue(listItemsUnsorted);
+
+    render(ListDetail, { props: { params: { listId } } });
+
+    await screen.findByText("Apples");
+    expect(screen.queryByRole("button", { name: "New experience" })).toBeNull();
   });
 
   it("toggles purchased state", async () => {
