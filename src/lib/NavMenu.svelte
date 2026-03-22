@@ -66,19 +66,19 @@
 
   {#if isOpen}
     <section class="nav-menu-panel" aria-label="Main navigation">
-      <div class="nav-menu-group">
-        <p class="nav-menu-label">Lists</p>
-        <button class="button ghost nav-menu-item" on:click={() => navigate("/lists")}>Active</button>
-        <button class="button ghost nav-menu-item" on:click={() => navigate("/lists/completed")}>Completed</button>
-      </div>
-
-      <div class="nav-menu-divider" role="separator"></div>
-
       <button class="button ghost nav-menu-item" on:click={() => navigate("/dashboard")}>Dashboard</button>
 
       <div class="nav-menu-divider" role="separator"></div>
 
       <button class="button ghost nav-menu-item" on:click={() => navigate("/templates")}>Templates</button>
+
+      <div class="nav-menu-divider" role="separator"></div>
+
+      <div class="nav-menu-group">
+        <p class="nav-menu-label">Lists</p>
+        <button class="button ghost nav-menu-item" on:click={() => navigate("/lists")}>Active</button>
+        <button class="button ghost nav-menu-item" on:click={() => navigate("/lists/completed")}>Completed</button>
+      </div>
 
       {#if isAdmin}
         <div class="nav-menu-divider" role="separator"></div>

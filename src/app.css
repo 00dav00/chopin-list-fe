@@ -100,13 +100,14 @@ p {
 .nav-menu-wrap {
   position: fixed;
   top: 1rem;
-  left: 1rem;
-  z-index: 1200;
+  left: max(1rem, calc((100vw - 980px) / 2 + 1.5rem));
+  z-index: 2000;
 }
 
 .nav-menu-toggle {
   width: 2.5rem;
   height: 2.5rem;
+  box-shadow: 0 8px 18px rgba(22, 80, 68, 0.22);
 }
 
 .nav-menu-panel {
@@ -222,6 +223,17 @@ p {
   background: transparent;
   color: var(--ink);
   border: 1px solid var(--border);
+}
+
+.button.ghost.nav-menu-toggle {
+  background: var(--accent);
+  color: #fff;
+  border: 1px solid var(--accent-strong);
+}
+
+.button.ghost.nav-menu-toggle:not(:disabled):hover {
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
 }
 
 .button.danger {
@@ -562,7 +574,7 @@ p {
 
   .nav-menu-wrap {
     top: 0.75rem;
-    left: 0.75rem;
+    left: 1.5rem;
   }
 
   .item-row {
