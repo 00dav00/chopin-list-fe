@@ -16,6 +16,7 @@
   let deletingId: string | null = null;
   let updatingStateId: string | null = null;
   let completeModalList: ListOut | null = null;
+  let deleteModalList: ListOut | null = null;
 
   const formatDate = (value: string) =>
     new Date(value).toLocaleDateString();
@@ -67,7 +68,6 @@
 
   const deleteList = async (listId: string) => {
     if (deletingId) return;
-    if (!window.confirm("Delete this list?")) return;
     deletingId = listId;
     error = null;
     try {
@@ -80,6 +80,25 @@
       }
     } finally {
       deletingId = null;
+    }
+  };
+
+  const openDeleteListModal = (list: ListOut) => {
+    if (deletingId) return;
+    deleteModalList = list;
+  };
+
+  const closeDeleteListModal = () => {
+    if (deletingId) return;
+    deleteModalList = null;
+  };
+
+  const confirmDeleteList = async () => {
+    if (!deleteModalList) return;
+    const listId = deleteModalList.id;
+    await deleteList(listId);
+    if (!error) {
+      deleteModalList = null;
     }
   };
 
@@ -191,7 +210,7 @@
               aria-label="Delete"
               title="Delete"
               disabled={deletingId === list.id}
-              on:click|stopPropagation={() => deleteList(list.id)}
+              on:click|stopPropagation={() => openDeleteListModal(list)}
             >
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path
@@ -252,6 +271,30 @@
         </button>
         <button class="button" disabled={updatingStateId !== null} on:click={confirmCompleteList}>
           {updatingStateId !== null ? "Completing..." : "Mark complete"}
+        </button>
+      </div>
+    </section>
+  </div>
+{/if}
+
+{#if deleteModalList}
+  <div class="modal-backdrop" role="presentation" on:click|self={closeDeleteListModal}>
+    <section
+      class="modal card stack"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="delete-list-title"
+    >
+      <h3 id="delete-list-title">Delete list?</h3>
+      <p class="meta">
+        This permanently deletes <strong>{deleteModalList.name}</strong> and its items.
+      </p>
+      <div class="toolbar">
+        <button class="button ghost" disabled={deletingId !== null} on:click={closeDeleteListModal}>
+          Cancel
+        </button>
+        <button class="button danger" disabled={deletingId !== null} on:click={confirmDeleteList}>
+          {deletingId !== null ? "Deleting..." : "Delete list"}
         </button>
       </div>
     </section>

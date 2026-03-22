@@ -17,6 +17,7 @@
   let createListModalTemplate: TemplateOut | null = null;
   let createListName = "";
   let creatingListFromTemplate = false;
+  let deleteModalTemplate: TemplateOut | null = null;
 
   const formatDate = (value: string) =>
     new Date(value).toLocaleDateString();
@@ -69,7 +70,6 @@
 
   const deleteTemplate = async (templateId: string) => {
     if (deletingId) return;
-    if (!window.confirm("Delete this template?")) return;
     deletingId = templateId;
     error = null;
     try {
@@ -82,6 +82,25 @@
       }
     } finally {
       deletingId = null;
+    }
+  };
+
+  const openDeleteTemplateModal = (template: TemplateOut) => {
+    if (deletingId) return;
+    deleteModalTemplate = template;
+  };
+
+  const closeDeleteTemplateModal = () => {
+    if (deletingId) return;
+    deleteModalTemplate = null;
+  };
+
+  const confirmDeleteTemplate = async () => {
+    if (!deleteModalTemplate) return;
+    const templateId = deleteModalTemplate.id;
+    await deleteTemplate(templateId);
+    if (!error) {
+      deleteModalTemplate = null;
     }
   };
 
@@ -179,7 +198,7 @@
               aria-label="Delete"
               title="Delete"
               disabled={deletingId === template.id}
-              on:click|stopPropagation={() => deleteTemplate(template.id)}
+              on:click|stopPropagation={() => openDeleteTemplateModal(template)}
             >
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path
@@ -253,6 +272,30 @@
           on:click={createListFromTemplate}
         >
           {creatingListFromTemplate ? "Creating..." : "Create list"}
+        </button>
+      </div>
+    </section>
+  </div>
+{/if}
+
+{#if deleteModalTemplate}
+  <div class="modal-backdrop" role="presentation" on:click|self={closeDeleteTemplateModal}>
+    <section
+      class="modal card stack"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="delete-template-title"
+    >
+      <h3 id="delete-template-title">Delete template?</h3>
+      <p class="meta">
+        This permanently deletes <strong>{deleteModalTemplate.name}</strong>.
+      </p>
+      <div class="toolbar">
+        <button class="button ghost" disabled={deletingId !== null} on:click={closeDeleteTemplateModal}>
+          Cancel
+        </button>
+        <button class="button danger" disabled={deletingId !== null} on:click={confirmDeleteTemplate}>
+          {deletingId !== null ? "Deleting..." : "Delete template"}
         </button>
       </div>
     </section>

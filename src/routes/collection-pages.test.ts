@@ -53,6 +53,8 @@ type CollectionConfig = {
   deleteMock: ReturnType<typeof vi.fn>;
   inputPlaceholder: string;
   createButtonLabel: string;
+  deleteModalTitle: string;
+  deleteModalActionLabel: string;
   emptyStateText: string;
   buildCreatePayload: (name: string) => unknown;
   makeExistingEntity: () => ListOut | TemplateOut;
@@ -68,6 +70,8 @@ const collectionConfigs: CollectionConfig[] = [
     deleteMock: apiMock.deleteList,
     inputPlaceholder: "New list name",
     createButtonLabel: "Create list",
+    deleteModalTitle: "Delete list?",
+    deleteModalActionLabel: "Delete list",
     emptyStateText: "No lists yet",
     buildCreatePayload: (name) => ({ name }),
     makeExistingEntity: () =>
@@ -90,6 +94,8 @@ const collectionConfigs: CollectionConfig[] = [
     deleteMock: apiMock.deleteTemplate,
     inputPlaceholder: "New template name",
     createButtonLabel: "Create template",
+    deleteModalTitle: "Delete template?",
+    deleteModalActionLabel: "Delete template",
     emptyStateText: "No templates yet",
     buildCreatePayload: (name) => ({ name, items: [] }),
     makeExistingEntity: () =>
@@ -116,7 +122,6 @@ describe.each(collectionConfigs)("$name route", (config) => {
     resetApiMocks();
     pushMock.mockReset();
     authStore.set({ token: "token", expiry: Date.now() + 10_000, user: null, ready: true });
-    vi.spyOn(window, "confirm").mockReturnValue(true);
   });
 
   it("loads existing entries", async () => {
@@ -177,6 +182,8 @@ describe.each(collectionConfigs)("$name route", (config) => {
 
     await screen.findByText(existing.name);
     await user.click(screen.getByRole("button", { name: "Delete" }));
+    expect(await screen.findByRole("heading", { name: config.deleteModalTitle })).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: config.deleteModalActionLabel }));
 
     await waitFor(() => {
       expect(config.deleteMock).toHaveBeenCalledWith(existing.id);
@@ -380,9 +387,14 @@ describe("Completed list lifecycle routes", () => {
     const addListButton = await screen.findByRole("button", { name: "Add list" });
     expect(addListButton.className).toContain("floating-add-item");
     await user.click(screen.getByRole("button", { name: "Open navigation menu" }));
+    expect(screen.getByRole("button", { name: "Dashboard" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Completed" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Templates" })).toBeTruthy();
 
+    await user.click(screen.getByRole("button", { name: "Dashboard" }));
+    expect(pushMock).toHaveBeenCalledWith("/dashboard");
+
+    await user.click(screen.getByRole("button", { name: "Open navigation menu" }));
     await user.click(screen.getByRole("button", { name: "Completed" }));
     expect(pushMock).toHaveBeenCalledWith("/lists/completed");
 
