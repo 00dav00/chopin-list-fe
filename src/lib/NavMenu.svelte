@@ -74,6 +74,10 @@
 
       <div class="nav-menu-divider" role="separator"></div>
 
+      <button class="button ghost nav-menu-item" on:click={() => navigate("/dashboard")}>Dashboard</button>
+
+      <div class="nav-menu-divider" role="separator"></div>
+
       <button class="button ghost nav-menu-item" on:click={() => navigate("/templates")}>Templates</button>
 
       {#if isAdmin}
