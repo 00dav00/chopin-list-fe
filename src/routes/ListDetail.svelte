@@ -443,6 +443,11 @@
         </button>
         <h1>{list ? list.name : "List"}</h1>
       </div>
+      {#if list && ($authStore.user?.admin ?? false)}
+        <button class="button ghost" on:click={() => list && push(`/lists/${list.id}/live`)}>
+          New experience
+        </button>
+      {/if}
     </div>
     <div class="page-header-side">
       <div class="nav-links">
