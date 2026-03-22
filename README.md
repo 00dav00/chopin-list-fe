@@ -59,3 +59,9 @@ Configured in `.env`:
 - `src/routes/`: page-level components
 - `src/lib/`: shared frontend logic (API, auth, types, errors)
 - `src/stores/`: client-side state
+
+## Live Updates (Phase 2)
+
+- Admin users can open `/lists/:listId/live` from the list detail page via the **New experience** action.
+- The live page subscribes to backend websocket events at `/v2/live/lists/:listId/ws`.
+- On each `list.changed` event the page refetches list metadata and items to stay in sync.

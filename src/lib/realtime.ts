@@ -47,8 +47,11 @@ export const connectLiveListSocket = ({
 
   socket.addEventListener("message", (event) => {
     const parsed = JSON.parse(String(event.data)) as LiveListEvent | { type: string };
-    if (parsed.type === "list.changed") {
-      onEvent(parsed);
+    if (
+      parsed.type === "list.changed" &&
+      typeof (parsed as { list_id?: unknown }).list_id === "string"
+    ) {
+      onEvent(parsed as LiveListEvent);
     }
   });
 
