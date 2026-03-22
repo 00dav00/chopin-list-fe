@@ -3,8 +3,9 @@
   import { push } from "svelte-spa-router";
   import { api } from "../lib/api";
   import { getApiErrorMessage } from "../lib/errors";
+  import NavMenu from "../lib/NavMenu.svelte";
   import type { PendingUserOut } from "../lib/types";
-  import { authStore, clearToken } from "../stores/auth";
+  import { authStore } from "../stores/auth";
 
   let pendingUsers: PendingUserOut[] = [];
   let loading = true;
@@ -32,11 +33,6 @@
     } finally {
       loading = false;
     }
-  };
-
-  const logout = () => {
-    clearToken();
-    push("/login");
   };
 
   const approveUser = async (userId: string) => {
@@ -79,18 +75,14 @@
 
 <main>
   <header class="page-header">
-    <div>
+    <div class="page-header-main">
       <h1>Pending user requests</h1>
-      <p>Review users waiting for admin confirmation.</p>
     </div>
-    <div class="nav-links">
-      <button class="button ghost" on:click={() => push("/admin/active-users")}>
-        Active users
-      </button>
-      <button class="button ghost" on:click={() => push("/dashboard")}>
-        Dashboard
-      </button>
-      <button class="button secondary" on:click={logout}>Sign out</button>
+    <div class="page-header-side">
+      <p class="header-description">Review users waiting for admin confirmation.</p>
+      <div class="nav-links">
+        <NavMenu isAdmin={$authStore.user?.admin ?? false} />
+      </div>
     </div>
   </header>
 

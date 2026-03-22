@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/svelte";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Dashboard from "./Dashboard.svelte";
 import { authStore } from "../stores/auth";
@@ -163,6 +164,7 @@ describe("Dashboard route", () => {
   });
 
   it("shows active-users card for admins with active and pending counts", async () => {
+    const user = userEvent.setup();
     authStore.set({
       token: "token",
       expiry: Date.now() + 10_000,
@@ -197,7 +199,8 @@ describe("Dashboard route", () => {
 
     render(Dashboard);
 
-    expect(await screen.findByRole("button", { name: "Active users" })).toBeTruthy();
+    await user.click(await screen.findByRole("button", { name: "Open navigation menu" }));
+    expect(await screen.findByRole("button", { name: "Pending" })).toBeTruthy();
     expect(await screen.findByRole("link", { name: "Open active users" })).toBeTruthy();
     expect(await screen.findByText("5 active users")).toBeTruthy();
     expect(await screen.findByText("2 pending users")).toBeTruthy();

@@ -313,11 +313,14 @@ describe("Completed list lifecycle routes", () => {
   });
 
   it("shows active users nav item only for admin", async () => {
+    const user = userEvent.setup();
     apiMock.listLists.mockResolvedValue([]);
     authStore.set({ token: "token", expiry: Date.now() + 10_000, user: null, ready: true });
 
     const { unmount } = render(Lists);
-    expect(screen.queryByRole("button", { name: "Active users" })).toBeNull();
+    await user.click(await screen.findByRole("button", { name: "Open navigation menu" }));
+    expect(screen.queryByText("Users")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Pending" })).toBeNull();
     unmount();
 
     authStore.set({
@@ -336,7 +339,9 @@ describe("Completed list lifecycle routes", () => {
     });
 
     render(Lists);
-    expect(await screen.findByRole("button", { name: "Active users" })).toBeTruthy();
+    await user.click(await screen.findByRole("button", { name: "Open navigation menu" }));
+    expect(await screen.findByText("Users")).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Pending" })).toBeTruthy();
   });
 
   it("shows updated list index actions and routes from header", async () => {
@@ -347,13 +352,27 @@ describe("Completed list lifecycle routes", () => {
 
     const addListButton = await screen.findByRole("button", { name: "Add list" });
     expect(addListButton.className).toContain("floating-add-item");
-    expect(screen.getByRole("button", { name: "Completed lists" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Create from template" })).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Open navigation menu" }));
+    expect(screen.getByRole("button", { name: "Completed" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Templates" })).toBeTruthy();
 
-    await user.click(screen.getByRole("button", { name: "Completed lists" }));
+    await user.click(screen.getByRole("button", { name: "Completed" }));
     expect(pushMock).toHaveBeenCalledWith("/lists/completed");
 
-    await user.click(screen.getByRole("button", { name: "Create from template" }));
+    await user.click(screen.getByRole("button", { name: "Open navigation menu" }));
+    await user.click(screen.getByRole("button", { name: "Templates" }));
     expect(pushMock).toHaveBeenCalledWith("/templates");
+  });
+
+  it("opens menu and signs out from menu action", async () => {
+    const user = userEvent.setup();
+    apiMock.listLists.mockResolvedValue([]);
+
+    render(Lists);
+
+    await user.click(await screen.findByRole("button", { name: "Open navigation menu" }));
+    await user.click(screen.getByRole("button", { name: "Sign out" }));
+
+    expect(pushMock).toHaveBeenCalledWith("/login");
   });
 });

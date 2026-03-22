@@ -2,8 +2,9 @@
   import { push } from "svelte-spa-router";
   import { api } from "../lib/api";
   import { getApiErrorMessage } from "../lib/errors";
+  import NavMenu from "../lib/NavMenu.svelte";
   import type { TemplateDetailOut, TemplateItemOut } from "../lib/types";
-  import { authStore, clearToken } from "../stores/auth";
+  import { authStore } from "../stores/auth";
 
   export let params: { templateId?: string } = {};
 
@@ -262,11 +263,6 @@
     }
   };
 
-  const logout = () => {
-    clearToken();
-    push("/login");
-  };
-
   const openCreateListModal = () => {
     createListName = "";
     createListModalOpen = true;
@@ -285,9 +281,8 @@
 
 <main>
   <header class="page-header">
-    <div>
+    <div class="page-header-main">
       <div class="title-with-action">
-        <h1>{template ? template.name : "Template"}</h1>
         <button
           class="button ghost icon-button"
           type="button"
@@ -301,23 +296,14 @@
             />
           </svg>
         </button>
+        <h1>{template ? template.name : "Template"}</h1>
       </div>
-      <p>Keep your starter items polished.</p>
     </div>
-    <div class="nav-links">
-      <button class="button ghost" on:click={() => push("/dashboard")}>
-        Dashboard
-      </button>
-      <button class="button ghost" on:click={() => push("/lists")}>Lists</button>
-      <button class="button ghost" on:click={() => push("/templates")}>
-        Templates
-      </button>
-      {#if $authStore.user?.admin}
-        <button class="button ghost" on:click={() => push("/admin/active-users")}>
-          Active users
-        </button>
-      {/if}
-      <button class="button secondary" on:click={logout}>Sign out</button>
+    <div class="page-header-side">
+      <p class="header-description">Keep your starter items polished.</p>
+      <div class="nav-links">
+        <NavMenu isAdmin={$authStore.user?.admin ?? false} />
+      </div>
     </div>
   </header>
 

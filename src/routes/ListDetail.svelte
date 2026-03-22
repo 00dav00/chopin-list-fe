@@ -2,8 +2,9 @@
   import { push } from "svelte-spa-router";
   import { api } from "../lib/api";
   import { getApiErrorMessage } from "../lib/errors";
+  import NavMenu from "../lib/NavMenu.svelte";
   import type { ItemOut, ListOut } from "../lib/types";
-  import { authStore, clearToken } from "../stores/auth";
+  import { authStore } from "../stores/auth";
 
   export let params: { listId?: string } = {};
 
@@ -369,11 +370,6 @@
     }
   };
 
-  const logout = () => {
-    clearToken();
-    push("/login");
-  };
-
   const completeCurrentList = async () => {
     if (!list || completingList || activatingList) return;
     completingList = true;
@@ -414,9 +410,8 @@
 
 <main>
   <header class="page-header">
-    <div>
+    <div class="page-header-main">
       <div class="title-with-action">
-        <h1>{list ? list.name : "List"}</h1>
         <button
           class="button ghost icon-button"
           type="button"
@@ -431,22 +426,13 @@
             />
           </svg>
         </button>
+        <h1>{list ? list.name : "List"}</h1>
       </div>
     </div>
-    <div class="nav-links">
-      <button class="button ghost" on:click={() => push("/dashboard")}>
-        Dashboard
-      </button>
-      <button class="button ghost" on:click={() => push("/lists")}>Lists</button>
-      <button class="button ghost" on:click={() => push("/templates")}>
-        Templates
-      </button>
-      {#if $authStore.user?.admin}
-        <button class="button ghost" on:click={() => push("/admin/active-users")}>
-          Active users
-        </button>
-      {/if}
-      <button class="button secondary" on:click={logout}>Sign out</button>
+    <div class="page-header-side">
+      <div class="nav-links">
+        <NavMenu isAdmin={$authStore.user?.admin ?? false} />
+      </div>
     </div>
   </header>
 

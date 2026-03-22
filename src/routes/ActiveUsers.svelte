@@ -3,8 +3,9 @@
   import { push } from "svelte-spa-router";
   import { api } from "../lib/api";
   import { getApiErrorMessage } from "../lib/errors";
+  import NavMenu from "../lib/NavMenu.svelte";
   import type { ConfirmedUserOut } from "../lib/types";
-  import { authStore, clearToken } from "../stores/auth";
+  import { authStore } from "../stores/auth";
 
   let activeUsers: ConfirmedUserOut[] = [];
   let loading = true;
@@ -50,28 +51,19 @@
     }
   };
 
-  const logout = () => {
-    clearToken();
-    push("/login");
-  };
-
   onMount(loadActiveUsers);
 </script>
 
 <main>
   <header class="page-header">
-    <div>
+    <div class="page-header-main">
       <h1>Active users</h1>
-      <p>Manage confirmed users and move them back to pending.</p>
     </div>
-    <div class="nav-links">
-      <button class="button ghost" on:click={() => push("/admin/pending-users")}>
-        Pending users
-      </button>
-      <button class="button ghost" on:click={() => push("/dashboard")}>
-        Dashboard
-      </button>
-      <button class="button secondary" on:click={logout}>Sign out</button>
+    <div class="page-header-side">
+      <p class="header-description">Manage confirmed users and move them back to pending.</p>
+      <div class="nav-links">
+        <NavMenu isAdmin={$authStore.user?.admin ?? false} />
+      </div>
     </div>
   </header>
 

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { push } from "svelte-spa-router";
+  import NavMenu from "../lib/NavMenu.svelte";
   import type { DashboardOut } from "../lib/types";
   import { getApiErrorMessage } from "../lib/errors";
   import { authStore, clearToken, setAuthNotice } from "../stores/auth";
@@ -64,11 +65,6 @@
     }
   };
 
-  const logout = () => {
-    clearToken();
-    push("/login");
-  };
-
   const formatDate = (value: string) =>
     new Date(value).toLocaleDateString();
 
@@ -80,16 +76,13 @@
 
 <main>
   <header class="page-header">
-    <div>
+    <div class="page-header-main">
       <h1>Chopin list</h1>
     </div>
-    <div class="nav-links">
-      {#if $authStore.user?.admin}
-        <button class="button ghost" on:click={() => push("/admin/active-users")}>
-          Active users
-        </button>
-      {/if}
-      <button class="button secondary" on:click={logout}>Sign out</button>
+    <div class="page-header-side">
+      <div class="nav-links">
+        <NavMenu isAdmin={$authStore.user?.admin ?? false} />
+      </div>
     </div>
   </header>
 

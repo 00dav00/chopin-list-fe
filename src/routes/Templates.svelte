@@ -3,8 +3,9 @@
   import { push } from "svelte-spa-router";
   import { api } from "../lib/api";
   import { getApiErrorMessage } from "../lib/errors";
+  import NavMenu from "../lib/NavMenu.svelte";
   import type { TemplateOut } from "../lib/types";
-  import { authStore, clearToken } from "../stores/auth";
+  import { authStore } from "../stores/auth";
 
   let templates: TemplateOut[] = [];
   let loading = true;
@@ -115,31 +116,19 @@
     }
   };
 
-  const logout = () => {
-    clearToken();
-    push("/login");
-  };
-
   onMount(loadTemplates);
 </script>
 
 <main>
   <header class="page-header">
-    <div>
+    <div class="page-header-main">
       <h1>Templates</h1>
-      <p>Reuse your favorite set of items.</p>
     </div>
-    <div class="nav-links">
-      <button class="button ghost" on:click={() => push("/dashboard")}>
-        Dashboard
-      </button>
-      <button class="button ghost" on:click={() => push("/lists")}>Lists</button>
-      {#if $authStore.user?.admin}
-        <button class="button ghost" on:click={() => push("/admin/active-users")}>
-          Active users
-        </button>
-      {/if}
-      <button class="button secondary" on:click={logout}>Sign out</button>
+    <div class="page-header-side">
+      <p class="header-description">Reuse your favorite set of items.</p>
+      <div class="nav-links">
+        <NavMenu isAdmin={$authStore.user?.admin ?? false} />
+      </div>
     </div>
   </header>
 
