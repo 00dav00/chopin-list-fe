@@ -123,6 +123,11 @@
     <div class="page-header-main">
       <h1>Live list monitor</h1>
       <p class="meta">New experience for near real-time list refresh.</p>
+      {#if list}
+        <button class="button ghost" on:click={() => list && push(`/lists/${list.id}`)}>
+          Back to current page
+        </button>
+      {/if}
     </div>
     <div class="page-header-side">
       <div class="nav-links">

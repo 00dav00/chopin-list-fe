@@ -13,7 +13,8 @@
   import Dashboard from "./routes/Dashboard.svelte";
   import Lists from "./routes/Lists.svelte";
   import CompletedLists from "./routes/CompletedLists.svelte";
-  import ListDetail from "./routes/ListDetail.svelte";
+import ListDetail from "./routes/ListDetail.svelte";
+import ListDetailLive from "./routes/ListDetailLive.svelte";
   import Templates from "./routes/Templates.svelte";
   import TemplateDetail from "./routes/TemplateDetail.svelte";
   import PendingUsers from "./routes/PendingUsers.svelte";
@@ -26,6 +27,7 @@
     "/dashboard": Dashboard,
     "/lists": Lists,
     "/lists/completed": CompletedLists,
+    "/lists/:listId/live": ListDetailLive,
     "/lists/:listId": ListDetail,
     "/templates": Templates,
     "/templates/:templateId": TemplateDetail,
