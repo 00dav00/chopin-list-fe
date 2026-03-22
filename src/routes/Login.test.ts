@@ -16,12 +16,19 @@ vi.mock("../lib/auth", () => ({
 
 describe("Login route", () => {
   let Login: typeof import("./Login.svelte").default;
+  let apiModule: typeof import("../lib/api");
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.resetModules();
     pushMock.mockReset();
     initGoogleSignInMock.mockReset();
     initGoogleSignInMock.mockReturnValue(() => {});
+    apiModule = await import("../lib/api");
+    vi.spyOn(apiModule.api, "getMe").mockResolvedValue({
+      id: "user-1",
+      admin: false,
+      created_at: "2026-01-01T00:00:00Z",
+    });
   });
 
   it("hydrates and displays persisted auth notice", async () => {
@@ -58,7 +65,31 @@ describe("Login route", () => {
     await waitFor(() => {
       expect(localStorage.getItem("auth_token")).toBe("jwt-token");
     });
+    await waitFor(() => {
+      expect(apiModule.api.getMe).toHaveBeenCalled();
+    });
     expect(pushMock).toHaveBeenCalledWith("/dashboard");
+  });
+
+  it("clears token and shows error when /me fails after sign-in", async () => {
+    vi.spyOn(apiModule.api, "getMe").mockRejectedValue(new Error("Boom"));
+    initGoogleSignInMock.mockImplementation(
+      (_elementId: string, onSuccess: (token: string) => void) => {
+        onSuccess("jwt-token");
+        return () => {};
+      }
+    );
+
+    const module = await import("./Login.svelte");
+    Login = module.default;
+
+    render(Login);
+
+    await waitFor(() => {
+      expect(localStorage.getItem("auth_token")).toBeNull();
+    });
+    expect(await screen.findByText("Sign in failed.")).toBeTruthy();
+    expect(pushMock).not.toHaveBeenCalledWith("/dashboard");
   });
 
   it("shows login error when Google sign-in initialization fails", async () => {

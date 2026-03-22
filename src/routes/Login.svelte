@@ -1,11 +1,15 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { push } from "svelte-spa-router";
+  import { api } from "../lib/api";
+  import { getApiErrorMessage } from "../lib/errors";
   import { initGoogleSignIn } from "../lib/auth";
   import {
     authNoticeStore,
+    clearToken,
     hydrateAuthNotice,
     saveToken,
+    setCurrentUser,
   } from "../stores/auth";
 
   let error: string | null = null;
@@ -15,9 +19,16 @@
 
     return initGoogleSignIn(
       "google-signin",
-      (token) => {
+      async (token) => {
         saveToken(token);
-        push("/dashboard");
+        try {
+          const user = await api.getMe();
+          setCurrentUser(user);
+          push("/dashboard");
+        } catch (err) {
+          clearToken();
+          error = getApiErrorMessage(err, "Sign in failed.");
+        }
       },
       (message) => {
         error = message;

@@ -97,6 +97,14 @@ export const saveToken = (token: string) => {
   }));
 };
 
+export const setCurrentUser = (user: UserOut | null) => {
+  authStore.update((state) => ({
+    ...state,
+    user,
+    ready: true,
+  }));
+};
+
 export const clearToken = () => {
   clearStoredAuth();
   authStore.set({
