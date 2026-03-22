@@ -15,6 +15,7 @@
   let createListModalOpen = false;
   let deletingId: string | null = null;
   let updatingStateId: string | null = null;
+  let completeModalList: ListOut | null = null;
 
   const formatDate = (value: string) =>
     new Date(value).toLocaleDateString();
@@ -99,6 +100,25 @@
     }
   };
 
+  const openCompleteListModal = (list: ListOut) => {
+    if (updatingStateId) return;
+    completeModalList = list;
+  };
+
+  const closeCompleteListModal = () => {
+    if (updatingStateId) return;
+    completeModalList = null;
+  };
+
+  const confirmCompleteList = async () => {
+    if (!completeModalList) return;
+    const listId = completeModalList.id;
+    await completeList(listId);
+    if (!error) {
+      completeModalList = null;
+    }
+  };
+
   onMount(loadLists);
 </script>
 
@@ -140,29 +160,40 @@
           }}
         >
           <div>
-            <h2>{list.name}</h2>
-            <p class="meta">Updated {formatDate(list.updated_at)}</p>
-            <p class="meta">{list.items_count} items</p>
-            {#if list.template_id}
-              <span class="badge">From template</span>
-            {/if}
+            <div class="inline-heading-meta">
+              <h2>{list.name}</h2>
+              <span class="title-inline-count">({list.items_count})</span>
+            </div>
+            <div class="list-card-meta-line">
+              <p class="meta">Updated at {formatDate(list.updated_at)}</p>
+              {#if list.template_id}
+                <span class="list-card-meta-separator" aria-hidden="true">·</span>
+                <p class="meta">From template</p>
+              {/if}
+            </div>
           </div>
           <div class="toolbar">
-              <button
-                class="button ghost"
-                disabled={updatingStateId === list.id}
-                on:click|stopPropagation={() => completeList(list.id)}
-              >
-                Mark complete
-              </button>
-              <button
-                class="button danger icon-button"
-                aria-label="Delete"
-                title="Delete"
-                disabled={deletingId === list.id}
-                on:click|stopPropagation={() => deleteList(list.id)}
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
+            <button
+              class="button ghost icon-button list-card-action"
+              aria-label="Archive list"
+              title="Mark complete"
+              disabled={updatingStateId === list.id}
+              on:click|stopPropagation={() => openCompleteListModal(list)}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M3 4h18v4h-1v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8H3V4zm3 4v11h12V8H6zm4 3h4v2h-4v-2z"
+                />
+              </svg>
+            </button>
+            <button
+              class="button danger icon-button list-card-action"
+              aria-label="Delete"
+              title="Delete"
+              disabled={deletingId === list.id}
+              on:click|stopPropagation={() => deleteList(list.id)}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path
                   d="M9 3h6l1 2h4v2H4V5h4l1-2zm-2 6h2v9H7V9zm4 0h2v9h-2V9zm4 0h2v9h-2V9zM6 21h12l1-14H5l1 14z"
                 />
@@ -194,6 +225,33 @@
         </button>
         <button class="button" disabled={creating} on:click={createList}>
           {creating ? "Creating..." : "Create list"}
+        </button>
+      </div>
+    </section>
+  </div>
+{/if}
+
+{#if completeModalList}
+  <div class="modal-backdrop" role="presentation" on:click|self={closeCompleteListModal}>
+    <section
+      class="modal card stack"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="complete-list-title"
+    >
+      <h3 id="complete-list-title">Mark list complete?</h3>
+      <p class="meta">This moves <strong>{completeModalList.name}</strong> to Completed lists.</p>
+      {#if (completeModalList.unpurchased_items_count ?? 0) > 0}
+        <p class="meta">
+          This list still has {completeModalList.unpurchased_items_count} unpurchased items.
+        </p>
+      {/if}
+      <div class="toolbar">
+        <button class="button ghost" disabled={updatingStateId !== null} on:click={closeCompleteListModal}>
+          Cancel
+        </button>
+        <button class="button" disabled={updatingStateId !== null} on:click={confirmCompleteList}>
+          {updatingStateId !== null ? "Completing..." : "Mark complete"}
         </button>
       </div>
     </section>

@@ -19,6 +19,7 @@ export const makeList = (overrides: ListOverrides = {}): ListOut => ({
   completed: false,
   template_id: null,
   items_count: 0,
+  unpurchased_items_count: 0,
   created_at: "2026-01-01T00:00:00Z",
   updated_at: "2026-01-01T00:00:00Z",
   ...overrides,

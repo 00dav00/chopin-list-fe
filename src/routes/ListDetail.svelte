@@ -15,6 +15,7 @@
   let listName = "";
   let savingName = false;
   let renameModalOpen = false;
+  let completeSuggestionModalOpen = false;
   let completingList = false;
   let activatingList = false;
 
@@ -274,6 +275,10 @@
 
   const toggleItem = async (itemId: string) => {
     if (togglingItemId || isListCompleted) return;
+    const targetItem = items.find((item) => item.id === itemId);
+    const shouldSuggestCompletion =
+      !!targetItem && !targetItem.purchased && unpurchasedItems.length === 1;
+
     togglingItemId = itemId;
     error = null;
     try {
@@ -281,6 +286,9 @@
       items = sortItems(
         items.map((item) => (item.id === itemId ? updated : item))
       );
+      if (shouldSuggestCompletion && updated.purchased) {
+        completeSuggestionModalOpen = true;
+      }
     } catch (err) {
       const message = getApiErrorMessage(err, "Toggle failed.");
       if (message) {
@@ -376,6 +384,7 @@
     error = null;
     try {
       list = await api.completeList(list.id);
+      completeSuggestionModalOpen = false;
     } catch (err) {
       const message = getApiErrorMessage(err, "Complete failed.");
       if (message) {
@@ -392,6 +401,7 @@
     error = null;
     try {
       list = await api.activateList(list.id);
+      completeSuggestionModalOpen = false;
     } catch (err) {
       const message = getApiErrorMessage(err, "Activate failed.");
       if (message) {
@@ -406,6 +416,11 @@
     currentListId = params.listId;
     loadList(currentListId);
   }
+
+  const closeCompleteSuggestionModal = () => {
+    if (completingList) return;
+    completeSuggestionModalOpen = false;
+  };
 </script>
 
 <main>
@@ -740,6 +755,28 @@
         </button>
         <button class="button" disabled={savingName} on:click={updateListName}>
           {savingName ? "Saving..." : "Save name"}
+        </button>
+      </div>
+    </section>
+  </div>
+{/if}
+
+{#if completeSuggestionModalOpen}
+  <div class="modal-backdrop" role="presentation" on:click|self={closeCompleteSuggestionModal}>
+    <section
+      class="modal card stack"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="complete-list-suggestion-title"
+    >
+      <h3 id="complete-list-suggestion-title">All items are now purchased.</h3>
+      <p class="meta">Would you like to mark this list as complete?</p>
+      <div class="toolbar">
+        <button class="button ghost" disabled={completingList} on:click={closeCompleteSuggestionModal}>
+          Keep active
+        </button>
+        <button class="button" disabled={completingList} on:click={completeCurrentList}>
+          {completingList ? "Completing..." : "Mark list complete"}
         </button>
       </div>
     </section>

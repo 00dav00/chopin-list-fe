@@ -35,6 +35,7 @@ export type ListOut = {
   completed: boolean;
   template_id?: string | null;
   items_count: number;
+  unpurchased_items_count?: number;
   created_at: string;
   updated_at: string;
 };

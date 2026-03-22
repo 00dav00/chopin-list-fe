@@ -126,7 +126,11 @@ describe.each(collectionConfigs)("$name route", (config) => {
     render(config.component);
 
     expect(await screen.findByText(existing.name)).toBeTruthy();
-    expect(screen.getByText(`${existing.items_count} items`)).toBeTruthy();
+    if (config.name === "Lists") {
+      expect(screen.getByText(`(${existing.items_count})`)).toBeTruthy();
+    } else {
+      expect(screen.getByText(`${existing.items_count} items`)).toBeTruthy();
+    }
   });
 
   it("creates a new entry", async () => {
@@ -156,7 +160,11 @@ describe.each(collectionConfigs)("$name route", (config) => {
       );
     });
     expect(await screen.findByText(createdName)).toBeTruthy();
-    expect(screen.getByText("0 items")).toBeTruthy();
+    if (config.name === "Lists") {
+      expect(screen.getByText("(0)")).toBeTruthy();
+    } else {
+      expect(screen.getByText("0 items")).toBeTruthy();
+    }
   });
 
   it("deletes an existing entry", async () => {
@@ -268,6 +276,7 @@ describe("Completed list lifecycle routes", () => {
     render(Lists);
 
     await screen.findByText("Errands");
+    await user.click(screen.getByRole("button", { name: "Archive list" }));
     await user.click(screen.getByRole("button", { name: "Mark complete" }));
 
     await waitFor(() => {
@@ -276,6 +285,24 @@ describe("Completed list lifecycle routes", () => {
     await waitFor(() => {
       expect(screen.queryByText("Errands")).toBeNull();
     });
+  });
+
+  it("shows remaining item count when confirming archive", async () => {
+    const user = userEvent.setup();
+    const active = makeList({
+      id: "list-active",
+      name: "Errands",
+      completed: false,
+      unpurchased_items_count: 3,
+    });
+    apiMock.listLists.mockResolvedValue([active]);
+
+    render(Lists);
+
+    await screen.findByText("Errands");
+    await user.click(screen.getByRole("button", { name: "Archive list" }));
+
+    expect(await screen.findByText("This list still has 3 unpurchased items.")).toBeTruthy();
   });
 
   it("opens list detail when clicking list card", async () => {

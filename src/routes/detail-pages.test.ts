@@ -477,6 +477,52 @@ describe("ListDetail route specific behavior", () => {
     expect(await screen.findByText("Apples")).toBeTruthy();
   });
 
+  it("suggests completing the list when the last unpurchased item is checked", async () => {
+    const user = userEvent.setup();
+    apiMock.getList.mockResolvedValue(listBase);
+    apiMock.listItems.mockResolvedValue([
+      makeItem({
+        id: listPrimaryItemId,
+        list_id: listId,
+        name: "Apples",
+        purchased: false,
+        sort_order: 1,
+      }),
+      makeItem({
+        id: "list-item-2",
+        list_id: listId,
+        name: "Bananas",
+        purchased: true,
+        sort_order: 2,
+      }),
+    ]);
+    apiMock.toggleItem.mockResolvedValue(
+      makeItem({
+        id: listPrimaryItemId,
+        list_id: listId,
+        name: "Apples",
+        purchased: true,
+        sort_order: 1,
+      })
+    );
+    apiMock.completeList.mockResolvedValue({ ...listBase, completed: true });
+
+    render(ListDetail, { props: { params: { listId } } });
+
+    await user.click(
+      (await screen.findAllByRole("checkbox", {
+        name: "Purchased Apples",
+      }))[0]
+    );
+
+    expect(await screen.findByText("All items are now purchased.")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Mark list complete" }));
+
+    await waitFor(() => {
+      expect(apiMock.completeList).toHaveBeenCalledWith(listId);
+    });
+  });
+
   it("moves an item back to main list when unchecked in purchased section", async () => {
     const user = userEvent.setup();
     apiMock.getList.mockResolvedValue(listBase);
