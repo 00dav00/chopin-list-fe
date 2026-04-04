@@ -155,6 +155,24 @@ describe("api client", () => {
     expect(fetchMock.mock.calls[2]?.[0]).toContain("/lists/list-42/activate");
   });
 
+  it("posts reordered item ids to the template reorder endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response("[]", { status: 200 })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const apiModule = await import("./api");
+    await apiModule.api.reorderTemplateItems("tmpl-1", ["item-c", "item-a", "item-b"]);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/templates/tmpl-1/items/reorder"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ item_ids: ["item-c", "item-a", "item-b"] }),
+      })
+    );
+  });
+
   it("hits admin user management endpoints", async () => {
     const fetchMock = vi
       .fn()

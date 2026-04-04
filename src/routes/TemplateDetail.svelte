@@ -31,6 +31,10 @@
   let creatingList = false;
   let createListModalOpen = false;
 
+  let reorderingItems = false;
+  let draggedItemId: string | null = null;
+  let dragOverItemId: string | null = null;
+
   let currentTemplateId = "";
 
   const parseOptionalNumber = (value: string) => {
@@ -61,6 +65,117 @@
     currentItems.reduce((maxSortOrder, item) => {
       return item.sort_order > maxSortOrder ? item.sort_order : maxSortOrder;
     }, 0) + 1;
+
+  const moveTemplateItem = (
+    currentItems: TemplateItemOut[],
+    sourceItemId: string,
+    targetItemId: string
+  ) => {
+    const sourceIndex = currentItems.findIndex((item) => item.id === sourceItemId);
+    const targetIndex = currentItems.findIndex((item) => item.id === targetItemId);
+
+    if (
+      sourceIndex < 0 ||
+      targetIndex < 0 ||
+      sourceIndex === targetIndex
+    ) {
+      return currentItems;
+    }
+
+    const reordered = [...currentItems];
+    const [moved] = reordered.splice(sourceIndex, 1);
+    reordered.splice(targetIndex, 0, moved);
+    return reordered;
+  };
+
+  const applyReorder = async (reordered: TemplateItemOut[], previousItems: TemplateItemOut[]) => {
+    if (!template) return;
+    items = reordered;
+    reorderingItems = true;
+    error = null;
+    try {
+      const updated = await api.reorderTemplateItems(
+        template.id,
+        reordered.map((item) => item.id)
+      );
+      items = sortItems(updated);
+    } catch (err) {
+      items = previousItems;
+      const message = getApiErrorMessage(err, "Reorder failed.");
+      if (message) {
+        error = message;
+      }
+    } finally {
+      reorderingItems = false;
+    }
+  };
+
+  const clearDragState = () => {
+    draggedItemId = null;
+    dragOverItemId = null;
+  };
+
+  const handleDragStart = (event: DragEvent, itemId: string) => {
+    if (editingItemId || savingItem || reorderingItems) {
+      event.preventDefault();
+      return;
+    }
+    draggedItemId = itemId;
+    event.dataTransfer?.setData("text/plain", itemId);
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = "move";
+    }
+  };
+
+  const handleDragOver = (event: DragEvent, targetItemId: string) => {
+    if (!draggedItemId || draggedItemId === targetItemId || reorderingItems) return;
+    event.preventDefault();
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = "move";
+    }
+    dragOverItemId = targetItemId;
+  };
+
+  const handleDrop = async (event: DragEvent, targetItemId: string) => {
+    event.preventDefault();
+    if (!template || reorderingItems) {
+      clearDragState();
+      return;
+    }
+
+    const sourceItemId =
+      draggedItemId || event.dataTransfer?.getData("text/plain") || null;
+    if (!sourceItemId || sourceItemId === targetItemId) {
+      clearDragState();
+      return;
+    }
+
+    const previousItems = items;
+    const reordered = moveTemplateItem(previousItems, sourceItemId, targetItemId);
+    clearDragState();
+    if (reordered === previousItems) return;
+    await applyReorder(reordered, previousItems);
+  };
+
+  const moveItemUp = async (itemId: string) => {
+    if (editingItemId || savingItem || reorderingItems) return;
+    const index = items.findIndex((item) => item.id === itemId);
+    if (index <= 0) return;
+    const previousItems = items;
+    const reordered = moveTemplateItem(previousItems, itemId, items[index - 1].id);
+    if (reordered === previousItems) return;
+    await applyReorder(reordered, previousItems);
+  };
+
+  const moveItemDown = async (itemId: string) => {
+    if (editingItemId || savingItem || reorderingItems) return;
+    const index = items.findIndex((item) => item.id === itemId);
+    if (index < 0 || index >= items.length - 1) return;
+    const previousItems = items;
+    const reordered = moveTemplateItem(previousItems, itemId, items[index + 1].id);
+    if (reordered === previousItems) return;
+    await applyReorder(reordered, previousItems);
+  };
 
   const loadTemplate = async (templateId: string) => {
     loading = true;
@@ -339,8 +454,19 @@
         <p class="meta">No items yet.</p>
       {:else}
         <div class="stack">
-          {#each items as item}
-            <div class="card">
+          {#each items as item (item.id)}
+            <div
+              class="card draggable-item"
+              class:drag-over={dragOverItemId === item.id}
+              class:dragging={draggedItemId === item.id}
+              draggable={!editingItemId && !savingItem && !reorderingItems}
+              role="listitem"
+              aria-grabbed={draggedItemId === item.id}
+              on:dragstart={(event) => handleDragStart(event, item.id)}
+              on:dragover={(event) => handleDragOver(event, item.id)}
+              on:drop={(event) => handleDrop(event, item.id)}
+              on:dragend={clearDragState}
+            >
               {#if editingItemId === item.id}
                 <div class="inline-form">
                   <input class="input" bind:value={editName} />
@@ -411,6 +537,28 @@
                       on:click={() => adjustTemplateItemQty(item, -1)}
                     >
                       -
+                    </button>
+                    <button
+                      class="button ghost icon-button"
+                      aria-label="Move up"
+                      title="Move up"
+                      disabled={!!editingItemId || savingItem || reorderingItems || items.indexOf(item) === 0}
+                      on:click={() => moveItemUp(item.id)}
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M12 8l-6 6 1.41 1.41L12 10.83l4.59 4.58L18 14z" />
+                      </svg>
+                    </button>
+                    <button
+                      class="button ghost icon-button"
+                      aria-label="Move down"
+                      title="Move down"
+                      disabled={!!editingItemId || savingItem || reorderingItems || items.indexOf(item) === items.length - 1}
+                      on:click={() => moveItemDown(item.id)}
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z" />
+                      </svg>
                     </button>
                     <button
                       class="button ghost icon-button"

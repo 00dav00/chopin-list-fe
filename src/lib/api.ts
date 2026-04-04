@@ -176,6 +176,11 @@ export const api = {
     fetchJson<null>(`/templates/${templateId}/items/${itemId}`, {
       method: "DELETE",
     }),
+  reorderTemplateItems: (templateId: string, itemIds: string[]) =>
+    fetchJson<TemplateItemOut[]>(`/templates/${templateId}/items/reorder`, {
+      method: "POST",
+      body: JSON.stringify({ item_ids: itemIds }),
+    }),
 
   createListFromTemplate: (
     templateId: string,
