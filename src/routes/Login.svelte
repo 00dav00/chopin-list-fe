@@ -1,25 +1,33 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { push } from "svelte-spa-router";
-  import { api } from "../lib/api";
+  import { api, ApiError } from "../lib/api";
   import { getApiErrorMessage } from "../lib/errors";
   import { initGoogleSignIn } from "../lib/auth";
   import {
     authNoticeStore,
     clearToken,
+    clearPendingApproval,
     hydrateAuthNotice,
+    isPendingApproval,
     saveToken,
     setCurrentUser,
+    setPendingApproval,
   } from "../stores/auth";
 
   let error: string | null = null;
+  let pendingApproval = false;
 
   onMount(() => {
     hydrateAuthNotice();
+    pendingApproval = isPendingApproval();
 
     return initGoogleSignIn(
       "google-signin",
       async (token) => {
+        error = null;
+        pendingApproval = false;
+        clearPendingApproval();
         saveToken(token);
         try {
           const user = await api.getMe();
@@ -27,7 +35,13 @@
           push("/dashboard");
         } catch (err) {
           clearToken();
-          error = getApiErrorMessage(err, "Sign in failed.");
+          if (err instanceof ApiError && err.status === 403) {
+            pendingApproval = true;
+            setPendingApproval();
+          } else {
+            clearPendingApproval();
+            error = getApiErrorMessage(err, "Sign in failed.");
+          }
         }
       },
       (message) => {
@@ -50,8 +64,34 @@
       <p class="meta">{$authNoticeStore}</p>
     {/if}
     <div id="google-signin"></div>
-    {#if error}
+    {#if pendingApproval}
+      <div class="pending-notice">
+        <p><strong>Account pending approval</strong></p>
+        <p>Your account has been registered but needs to be approved by an admin before you can sign in. Try signing in again below once you've been notified.</p>
+      </div>
+    {:else if error}
       <p class="meta">{error}</p>
     {/if}
   </section>
 </main>
+
+<style>
+  .pending-notice {
+    background-color: #fdf6e3;
+    border: 1px solid #e8c97a;
+    border-radius: 12px;
+    padding: 0.85rem 1rem;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: #4a3a00;
+  }
+
+  .pending-notice p {
+    margin: 0;
+    color: #4a3a00;
+  }
+
+  .pending-notice p + p {
+    margin-top: 0.35rem;
+  }
+</style>

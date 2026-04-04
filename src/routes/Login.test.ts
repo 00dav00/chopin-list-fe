@@ -111,4 +111,72 @@ describe("Login route", () => {
 
     expect(await screen.findByText("Google sign-in script not loaded.")).toBeTruthy();
   });
+
+  // --- pending-approval persistence ---
+
+  it("shows the pending-approval box on mount when the flag is set in sessionStorage", async () => {
+    sessionStorage.setItem("auth_pending_approval", "true");
+
+    const module = await import("./Login.svelte");
+    Login = module.default;
+
+    render(Login);
+
+    expect(await screen.findByText("Account pending approval")).toBeTruthy();
+  });
+
+  it("does not show the pending-approval box on mount when the flag is not set", async () => {
+    const module = await import("./Login.svelte");
+    Login = module.default;
+
+    render(Login);
+
+    // Wait for the component to settle (auth notice check), then assert absence
+    await screen.findByRole("main");
+    expect(screen.queryByText("Account pending approval")).toBeNull();
+  });
+
+  it("clears the pending flag after a successful sign-in", async () => {
+    sessionStorage.setItem("auth_pending_approval", "true");
+
+    initGoogleSignInMock.mockImplementation(
+      (_elementId: string, onSuccess: (token: string) => void) => {
+        onSuccess("jwt-token");
+        return () => {};
+      }
+    );
+
+    const module = await import("./Login.svelte");
+    Login = module.default;
+
+    render(Login);
+
+    await waitFor(() => {
+      expect(sessionStorage.getItem("auth_pending_approval")).toBeNull();
+    });
+    expect(pushMock).toHaveBeenCalledWith("/dashboard");
+  });
+
+  it("shows pending-approval box and persists the flag when /me returns 403", async () => {
+    const { ApiError } = await import("../lib/api");
+    vi.spyOn(apiModule.api, "getMe").mockRejectedValue(
+      new ApiError(403, "API request failed", "Forbidden")
+    );
+
+    initGoogleSignInMock.mockImplementation(
+      (_elementId: string, onSuccess: (token: string) => void) => {
+        onSuccess("jwt-token");
+        return () => {};
+      }
+    );
+
+    const module = await import("./Login.svelte");
+    Login = module.default;
+
+    render(Login);
+
+    expect(await screen.findByText("Account pending approval")).toBeTruthy();
+    expect(sessionStorage.getItem("auth_pending_approval")).toBe("true");
+    expect(pushMock).not.toHaveBeenCalledWith("/dashboard");
+  });
 });

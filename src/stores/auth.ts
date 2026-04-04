@@ -1,10 +1,11 @@
 import { get, writable } from "svelte/store";
-import { api, setAuthTokenGetter } from "../lib/api";
+import { api, ApiError, setAuthTokenGetter } from "../lib/api";
 import type { UserOut } from "../lib/types";
 
 const TOKEN_KEY = "auth_token";
 const EXPIRY_KEY = "auth_expiry";
 const NOTICE_KEY = "auth_notice";
+const PENDING_KEY = "auth_pending_approval";
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 export type AuthState = {
@@ -53,6 +54,23 @@ export const hydrateAuthNotice = () => {
   }
 };
 
+export const setPendingApproval = () => {
+  if (typeof sessionStorage !== "undefined") {
+    sessionStorage.setItem(PENDING_KEY, "true");
+  }
+};
+
+export const clearPendingApproval = () => {
+  if (typeof sessionStorage !== "undefined") {
+    sessionStorage.removeItem(PENDING_KEY);
+  }
+};
+
+export const isPendingApproval = (): boolean => {
+  if (typeof sessionStorage === "undefined") return false;
+  return sessionStorage.getItem(PENDING_KEY) === "true";
+};
+
 const readStoredAuth = () => {
   if (typeof localStorage === "undefined") {
     return { token: null, expiry: null };
@@ -90,6 +108,7 @@ export const saveToken = (token: string) => {
   const expiry = Date.now() + WEEK_MS;
   writeStoredAuth(token, expiry);
   clearAuthNotice();
+  clearPendingApproval();
   authStore.update((state) => ({
     ...state,
     token,
@@ -143,8 +162,13 @@ export const bootstrapAuth = async () => {
       user,
       ready: true,
     });
-  } catch {
+  } catch (err) {
     clearStoredAuth();
+    if (err instanceof ApiError && err.status === 403) {
+      setPendingApproval();
+    } else {
+      clearPendingApproval();
+    }
     authStore.set({
       token: null,
       expiry: null,

@@ -129,4 +129,73 @@ describe("auth store", () => {
       ready: true,
     });
   });
+
+  // --- pending-approval persistence ---
+
+  it("setPendingApproval writes 'true' to sessionStorage[auth_pending_approval]", () => {
+    authModule.setPendingApproval();
+    expect(sessionStorage.getItem("auth_pending_approval")).toBe("true");
+  });
+
+  it("clearPendingApproval removes the key from sessionStorage", () => {
+    authModule.setPendingApproval();
+    authModule.clearPendingApproval();
+    expect(sessionStorage.getItem("auth_pending_approval")).toBeNull();
+  });
+
+  it("isPendingApproval returns true when the key is 'true'", () => {
+    authModule.setPendingApproval();
+    expect(authModule.isPendingApproval()).toBe(true);
+  });
+
+  it("isPendingApproval returns false when the key is not set", () => {
+    expect(authModule.isPendingApproval()).toBe(false);
+  });
+
+  it("isPendingApproval returns false when the key is set to a value other than 'true'", () => {
+    sessionStorage.setItem("auth_pending_approval", "yes");
+    expect(authModule.isPendingApproval()).toBe(false);
+  });
+
+  it("saveToken clears the pending approval flag", () => {
+    authModule.setPendingApproval();
+    authModule.saveToken("my-token");
+    expect(authModule.isPendingApproval()).toBe(false);
+  });
+
+  it("bootstrapAuth calls setPendingApproval when /me returns a 403", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(5_000);
+    localStorage.setItem("auth_token", "token-abc");
+    localStorage.setItem("auth_expiry", "15000");
+    vi.spyOn(apiModule.api, "getMe").mockRejectedValue(
+      new apiModule.ApiError(403, "API request failed", "Forbidden")
+    );
+
+    await authModule.bootstrapAuth();
+
+    expect(authModule.isPendingApproval()).toBe(true);
+    expect(localStorage.getItem("auth_token")).toBeNull();
+    expect(localStorage.getItem("auth_expiry")).toBeNull();
+    expect(get(authModule.authStore)).toEqual({
+      token: null,
+      expiry: null,
+      user: null,
+      ready: true,
+    });
+  });
+
+  it("bootstrapAuth calls clearPendingApproval when /me returns a non-403 error", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(5_000);
+    localStorage.setItem("auth_token", "token-abc");
+    localStorage.setItem("auth_expiry", "15000");
+    vi.spyOn(apiModule.api, "getMe").mockRejectedValue(
+      new apiModule.ApiError(500, "API request failed", "Server Error")
+    );
+
+    // Pre-set the flag to confirm it gets cleared
+    authModule.setPendingApproval();
+    await authModule.bootstrapAuth();
+
+    expect(authModule.isPendingApproval()).toBe(false);
+  });
 });
