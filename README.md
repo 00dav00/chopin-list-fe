@@ -1,5 +1,7 @@
 # Chopin List Frontend
 
+[![Frontend tests](https://github.com/00dav00/chopin-list-fe/actions/workflows/fe.yml/badge.svg)](https://github.com/00dav00/chopin-list-fe/actions/workflows/fe.yml)
+
 Frontend application for Chopin List, built with Svelte + Vite.
 
 ## Prerequisites
