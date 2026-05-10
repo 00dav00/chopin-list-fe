@@ -436,6 +436,10 @@ p {
   background: #f3f8f6;
 }
 
+.draggable-item.dragging {
+  opacity: 0.45;
+}
+
 .item-main {
   display: flex;
   align-items: center;

@@ -1,10 +1,14 @@
 <script lang="ts">
-  import { push } from "svelte-spa-router";
-  import { api } from "../lib/api";
+  import { onDestroy, onMount } from "svelte";
+  import { api, ApiError } from "../lib/api";
   import { getApiErrorMessage } from "../lib/errors";
   import NavMenu from "../lib/NavMenu.svelte";
   import type { ItemOut, ListOut } from "../lib/types";
   import { authStore } from "../stores/auth";
+
+  // Time between a refetch failure and the offline banner mounting.
+  // Tuning knob; module constant per team convention (constants over env).
+  const BANNER_GRACE_MS = 5_000;
 
   export let params: { listId?: string } = {};
 
@@ -35,9 +39,40 @@
   let dragOverItemId: string | null = null;
 
   let currentListId = "";
+
+  // Visibility-gated refetch state.
+  let lastEtag: string | null = null;
+  let bannerMounted = false;
+  let bannerTimer: ReturnType<typeof setTimeout> | null = null;
+  // Last-write-wins buffer: while the edit-clobber guard defers a refetch,
+  // only the most-recent payload is retained; older deferred payloads are
+  // dropped on arrival of a newer one.
+  let bufferedRefetch: {
+    list: ListOut;
+    items: ItemOut[];
+    etag: string | null;
+  } | null = null;
+  // Monotonic refetch counter — used to drop in-flight refetch results that
+  // were superseded before they returned (keeps last-write-wins honest).
+  let refetchCounter = 0;
+  let inflightController: AbortController | null = null;
+
   $: isListCompleted = list?.completed ?? false;
   $: purchasedItems = items.filter((item) => item.purchased);
   $: unpurchasedItems = items.filter((item) => !item.purchased);
+
+  // Edit-clobber guard predicates: defer refetch reconciliation while the
+  // user has a focused item input, an open modal binding to server-owned
+  // fields, or an in-flight drag.
+  $: hasFocusedItemInput = editingItemId !== null;
+  $: isDragging = draggedItemId !== null || reorderingItems;
+  $: hasOpenModal = renameModalOpen || addItemModalOpen;
+  $: refetchDeferred = hasFocusedItemInput || isDragging || hasOpenModal;
+
+  // Apply the buffered refetch when the guard releases (blur / dragend).
+  $: if (!refetchDeferred && bufferedRefetch) {
+    applyBufferedRefetch();
+  }
 
   const parseOptionalNumber = (value: string) => {
     const trimmed = value.trim();
@@ -90,6 +125,43 @@
     return reordered;
   };
 
+  // Apply buffered refetch payload once the clobber guard releases.
+  // TODO: a successful local write (saveItem/toggleItem/etc.) that lands
+  // during the deferred window can be reverted here when the buffer carries
+  // pre-write server state. Track a mutationCounter and drop the buffer if
+  // it advanced since capture, or refetch fresh on guard release.
+  const applyBufferedRefetch = () => {
+    if (!bufferedRefetch) return;
+    const buffered = bufferedRefetch;
+    bufferedRefetch = null;
+    list = buffered.list;
+    listName = buffered.list.name;
+    items = sortItems(buffered.items);
+    if (buffered.etag) lastEtag = buffered.etag;
+  };
+
+  // Banner timer state machine (idle → pending → mounted → idle).
+  // Single timer per failure run. A success at any stage clears both timer
+  // and banner; a fresh failure after success starts a new timer.
+  const handleRefetchSuccess = () => {
+    if (bannerTimer) {
+      clearTimeout(bannerTimer);
+      bannerTimer = null;
+    }
+    bannerMounted = false;
+  };
+
+  const handleRefetchError = (err: unknown) => {
+    // Server replied (ApiError) or we aborted the request: not "offline".
+    if (err instanceof ApiError) return;
+    if (err instanceof DOMException && err.name === "AbortError") return;
+    if (bannerTimer || bannerMounted) return;
+    bannerTimer = setTimeout(() => {
+      bannerMounted = true;
+      bannerTimer = null;
+    }, BANNER_GRACE_MS);
+  };
+
   const loadList = async (listId: string) => {
     loading = true;
     error = null;
@@ -110,6 +182,133 @@
       loading = false;
     }
   };
+
+  // Visibility/focus-gated background refetch with ETag (If-None-Match).
+  // The first background refetch after a fresh page load sends no
+  // If-None-Match (lastEtag is null) and captures the ETag from the 200
+  // response; subsequent refetches send it and may receive 304.
+  const backgroundRefetch = async () => {
+    if (!currentListId) return;
+
+    // Coalesce rapid focus/visibility events and cancel cross-list races
+    // by aborting any in-flight refetch before starting a new one.
+    inflightController?.abort();
+    const controller = new AbortController();
+    inflightController = controller;
+
+    const myToken = ++refetchCounter;
+    try {
+      const result = await api.getListWithEtag(
+        currentListId,
+        lastEtag,
+        controller.signal
+      );
+      if (myToken !== refetchCounter) return;
+
+      if (result.status === 304) {
+        if (result.etag) lastEtag = result.etag;
+        handleRefetchSuccess();
+        return;
+      }
+
+      // 200: also refetch items. Every item write bumps lists.updated_at,
+      // so an ETag mismatch means items may have changed.
+      const fetchedItems = await api.listItems(currentListId);
+      if (myToken !== refetchCounter) return;
+
+      const payload = {
+        list: result.list,
+        items: fetchedItems,
+        etag: result.etag,
+      };
+
+      if (refetchDeferred) {
+        // Last-write-wins: stash the newest payload, drop any older deferred.
+        // lastEtag advances only when the buffered payload is applied, so
+        // If-None-Match continues to describe the displayed state.
+        bufferedRefetch = payload;
+        handleRefetchSuccess();
+        return;
+      }
+
+      list = payload.list;
+      listName = payload.list.name;
+      items = sortItems(payload.items);
+      if (payload.etag) lastEtag = payload.etag;
+      handleRefetchSuccess();
+    } catch (err) {
+      if (myToken !== refetchCounter) return;
+      handleRefetchError(err);
+    } finally {
+      if (inflightController === controller) {
+        inflightController = null;
+      }
+    }
+  };
+
+  const onVisibilityChange = () => {
+    if (typeof document !== "undefined" && document.visibilityState === "visible") {
+      void backgroundRefetch();
+    }
+  };
+
+  const onWindowFocus = () => {
+    void backgroundRefetch();
+  };
+
+  // Window-level dragend fallback: per-element dragend is not fired on
+  // Esc-cancel, drop on a disabled target, or when the source element is
+  // removed mid-drag. Without this, draggedItemId can stay set and pin
+  // refetchDeferred=true indefinitely.
+  const onWindowDragEnd = () => {
+    draggedItemId = null;
+    dragOverItemId = null;
+  };
+
+  // Reset all per-list refetch state. Bumping refetchCounter and aborting
+  // the in-flight request guarantee no late-resolving fetch can write into
+  // the new list's view.
+  const resetRefetchState = () => {
+    refetchCounter++;
+    inflightController?.abort();
+    inflightController = null;
+    if (bannerTimer) {
+      clearTimeout(bannerTimer);
+      bannerTimer = null;
+    }
+    bannerMounted = false;
+    lastEtag = null;
+    bufferedRefetch = null;
+    draggedItemId = null;
+    dragOverItemId = null;
+  };
+
+  onMount(() => {
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", onVisibilityChange);
+    }
+    if (typeof window !== "undefined") {
+      window.addEventListener("focus", onWindowFocus);
+      window.addEventListener("dragend", onWindowDragEnd);
+    }
+  });
+
+  onDestroy(() => {
+    if (typeof document !== "undefined") {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    }
+    if (typeof window !== "undefined") {
+      window.removeEventListener("focus", onWindowFocus);
+      window.removeEventListener("dragend", onWindowDragEnd);
+    }
+    refetchCounter++;
+    inflightController?.abort();
+    inflightController = null;
+    if (bannerTimer) {
+      clearTimeout(bannerTimer);
+      bannerTimer = null;
+    }
+  });
 
   const updateListName = async () => {
     if (!list || savingName || isListCompleted) return;
@@ -413,6 +612,12 @@
   };
 
   $: if (params.listId && params.listId !== currentListId) {
+    if (currentListId) {
+      // Mid-session route change: invalidate per-list refetch state so an
+      // in-flight or buffered refetch for the previous list cannot apply
+      // onto the new one.
+      resetRefetchState();
+    }
     currentListId = params.listId;
     loadList(currentListId);
   }
@@ -424,6 +629,11 @@
 </script>
 
 <main>
+  {#if bannerMounted}
+    <div class="banner offline-banner" role="status" aria-live="polite">
+      Offline — please refresh
+    </div>
+  {/if}
   <header class="page-header">
     <div class="page-header-main">
       <div class="title-with-action">
@@ -443,11 +653,6 @@
         </button>
         <h1>{list ? list.name : "List"}</h1>
       </div>
-      {#if list && ($authStore.user?.admin ?? false)}
-        <button class="button ghost" on:click={() => list && push(`/lists/${list.id}/live`)}>
-          New experience
-        </button>
-      {/if}
     </div>
     <div class="page-header-side">
       <div class="nav-links">

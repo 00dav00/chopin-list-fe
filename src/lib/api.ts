@@ -16,7 +16,12 @@ import type {
   CreateListFromTemplate,
   PendingUserOut,
   ConfirmedUserOut,
+  GetListResult,
 } from "./types";
+
+export type { GetListResult } from "./types";
+
+const REFETCH_TIMEOUT_MS = 10_000;
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
@@ -44,15 +49,52 @@ export const setUnauthorizedHandler = (fn: UnauthorizedHandler | null) => {
   onUnauthorized = fn;
 };
 
+const applyAuthHeader = (headers: Headers) => {
+  const token = getToken();
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+};
+
+const parseErrorDetail = (text: string, fallback: string): string => {
+  if (!text) return fallback;
+  try {
+    const parsed = JSON.parse(text) as { detail?: string; message?: string };
+    return parsed.detail || parsed.message || fallback;
+  } catch {
+    return text || fallback;
+  }
+};
+
+const throwApiError = async (res: Response): Promise<never> => {
+  if (res.status === 401) onUnauthorized?.();
+  const text = await res.text();
+  const detail = parseErrorDetail(text, res.statusText);
+  throw new ApiError(res.status, "API request failed", detail);
+};
+
+const combineSignals = (
+  signals: (AbortSignal | undefined)[]
+): AbortSignal => {
+  const filtered = signals.filter((s): s is AbortSignal => Boolean(s));
+  if (filtered.length === 1) return filtered[0];
+  const controller = new AbortController();
+  for (const signal of filtered) {
+    if (signal.aborted) {
+      controller.abort();
+      break;
+    }
+    signal.addEventListener("abort", () => controller.abort(), { once: true });
+  }
+  return controller.signal;
+};
+
 async function fetchJson<T>(
   path: string,
   init: RequestInit = {}
 ): Promise<T> {
   const headers = new Headers(init.headers || {});
-  const token = getToken();
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
+  applyAuthHeader(headers);
   if (init.body && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
@@ -66,29 +108,17 @@ async function fetchJson<T>(
     return null as T;
   }
 
-  let payload: unknown = null;
-  const text = await res.text();
-  if (text) {
-    try {
-      payload = JSON.parse(text);
-    } catch {
-      payload = text;
-    }
-  }
-
   if (!res.ok) {
-    if (res.status === 401) {
-      onUnauthorized?.();
-    }
-
-    const detail =
-      (payload as { detail?: string; message?: string } | null)?.detail ||
-      (payload as { detail?: string; message?: string } | null)?.message ||
-      res.statusText;
-    throw new ApiError(res.status, "API request failed", detail);
+    await throwApiError(res);
   }
 
-  return payload as T;
+  const text = await res.text();
+  if (!text) return null as T;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return text as unknown as T;
+  }
 }
 
 export const api = {
@@ -102,6 +132,39 @@ export const api = {
       body: JSON.stringify(payload),
     }),
   getList: (listId: string) => fetchJson<ListOut>(`/lists/${listId}`),
+  getListWithEtag: async (
+    listId: string,
+    ifNoneMatch: string | null,
+    signal?: AbortSignal
+  ): Promise<GetListResult> => {
+    const headers = new Headers();
+    applyAuthHeader(headers);
+    if (ifNoneMatch) headers.set("If-None-Match", ifNoneMatch);
+
+    const timeoutController = new AbortController();
+    const timeoutId = setTimeout(
+      () => timeoutController.abort(),
+      REFETCH_TIMEOUT_MS
+    );
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/lists/${listId}`, {
+        cache: "no-store",
+        headers,
+        signal: combineSignals([signal, timeoutController.signal]),
+      });
+      if (res.status === 304) {
+        return { status: 304, etag: res.headers.get("ETag") };
+      }
+      if (!res.ok) {
+        await throwApiError(res);
+      }
+      const list = (await res.json()) as ListOut;
+      return { status: 200, etag: res.headers.get("ETag"), list };
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  },
   completeList: (listId: string) =>
     fetchJson<ListOut>(`/lists/${listId}/complete`, {
       method: "POST",
@@ -175,6 +238,11 @@ export const api = {
   deleteTemplateItem: (templateId: string, itemId: string) =>
     fetchJson<null>(`/templates/${templateId}/items/${itemId}`, {
       method: "DELETE",
+    }),
+  reorderTemplateItems: (templateId: string, itemIds: string[]) =>
+    fetchJson<TemplateItemOut[]>(`/templates/${templateId}/items/reorder`, {
+      method: "POST",
+      body: JSON.stringify({ item_ids: itemIds }),
     }),
 
   createListFromTemplate: (

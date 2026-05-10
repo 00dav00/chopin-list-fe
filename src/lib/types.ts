@@ -40,6 +40,10 @@ export type ListOut = {
   updated_at: string;
 };
 
+export type GetListResult =
+  | { status: 200; etag: string | null; list: ListOut }
+  | { status: 304; etag: string | null };
+
 export type ListCreate = {
   name: string;
   template_id?: string | null;
@@ -148,10 +152,4 @@ export type DashboardOut = {
   pending_users_count?: number | null;
   last_created_lists: DashboardListOut[];
   last_created_templates: DashboardTemplateOut[];
-};
-
-export type LiveListEvent = {
-  type: "list.changed";
-  list_id: string;
-  operation?: "insert" | "update" | "replace" | "delete";
 };
