@@ -149,9 +149,3 @@ export type DashboardOut = {
   last_created_lists: DashboardListOut[];
   last_created_templates: DashboardTemplateOut[];
 };
-
-export type LiveListEvent = {
-  type: "list.changed";
-  list_id: string;
-  operation?: "insert" | "update" | "replace" | "delete";
-};
