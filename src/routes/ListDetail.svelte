@@ -1,10 +1,14 @@
 <script lang="ts">
-  import { push } from "svelte-spa-router";
+  import { onDestroy, onMount } from "svelte";
   import { api } from "../lib/api";
   import { getApiErrorMessage } from "../lib/errors";
   import NavMenu from "../lib/NavMenu.svelte";
   import type { ItemOut, ListOut } from "../lib/types";
   import { authStore } from "../stores/auth";
+
+  // Time between a refetch failure and the offline banner mounting.
+  // Tuning knob; module constant per team convention (constants over env).
+  const BANNER_GRACE_MS = 5_000;
 
   export let params: { listId?: string } = {};
 
@@ -35,9 +39,38 @@
   let dragOverItemId: string | null = null;
 
   let currentListId = "";
+
+  // Visibility-gated refetch state.
+  let lastEtag: string | null = null;
+  let bannerMounted = false;
+  let bannerTimer: ReturnType<typeof setTimeout> | null = null;
+  // Last-write-wins buffer: while the edit-clobber guard defers a refetch,
+  // only the most-recent payload is retained; older deferred payloads are
+  // dropped on arrival of a newer one.
+  let bufferedRefetch: {
+    list: ListOut;
+    items: ItemOut[];
+    etag: string | null;
+  } | null = null;
+  // Monotonic refetch counter — used to drop in-flight refetch results that
+  // were superseded before they returned (keeps last-write-wins honest).
+  let refetchCounter = 0;
+
   $: isListCompleted = list?.completed ?? false;
   $: purchasedItems = items.filter((item) => item.purchased);
   $: unpurchasedItems = items.filter((item) => !item.purchased);
+
+  // Edit-clobber guard predicates (#1): defer refetch reconciliation while
+  // the user has a focused item input or is dragging. `editingItemId` covers
+  // inline edit form focus; `draggedItemId`/`reorderingItems` cover drag.
+  $: hasFocusedItemInput = editingItemId !== null;
+  $: isDragging = draggedItemId !== null || reorderingItems;
+  $: refetchDeferred = hasFocusedItemInput || isDragging;
+
+  // Apply the buffered refetch when the guard releases (blur / dragend).
+  $: if (!refetchDeferred && bufferedRefetch) {
+    applyBufferedRefetch();
+  }
 
   const parseOptionalNumber = (value: string) => {
     const trimmed = value.trim();
@@ -90,6 +123,36 @@
     return reordered;
   };
 
+  // Apply buffered refetch payload once the clobber guard releases.
+  const applyBufferedRefetch = () => {
+    if (!bufferedRefetch) return;
+    const buffered = bufferedRefetch;
+    bufferedRefetch = null;
+    list = buffered.list;
+    listName = buffered.list.name;
+    items = sortItems(buffered.items);
+    if (buffered.etag) lastEtag = buffered.etag;
+  };
+
+  // Banner timer state machine (idle → pending → mounted → idle).
+  // Single timer per failure run. A success at any stage clears both timer
+  // and banner; a fresh failure after success starts a new timer.
+  const handleRefetchSuccess = () => {
+    if (bannerTimer) {
+      clearTimeout(bannerTimer);
+      bannerTimer = null;
+    }
+    bannerMounted = false;
+  };
+
+  const handleRefetchError = () => {
+    if (bannerTimer || bannerMounted) return;
+    bannerTimer = setTimeout(() => {
+      bannerMounted = true;
+      bannerTimer = null;
+    }, BANNER_GRACE_MS);
+  };
+
   const loadList = async (listId: string) => {
     loading = true;
     error = null;
@@ -110,6 +173,85 @@
       loading = false;
     }
   };
+
+  // Visibility/focus-gated background refetch with ETag (If-None-Match).
+  // The first background refetch after a fresh page load sends no
+  // If-None-Match (lastEtag is null) and captures the ETag from the 200
+  // response; subsequent refetches send it and may receive 304.
+  const backgroundRefetch = async () => {
+    if (!currentListId) return;
+    const myToken = ++refetchCounter;
+    try {
+      const result = await api.getListWithEtag(currentListId, lastEtag);
+      if (myToken !== refetchCounter) return;
+
+      if (result.status === 304) {
+        if (result.etag) lastEtag = result.etag;
+        handleRefetchSuccess();
+        return;
+      }
+
+      // 200: also refetch items. Every item write bumps lists.updated_at
+      // (#26 invariant), so an ETag mismatch means items may have changed.
+      const fetchedItems = await api.listItems(currentListId);
+      if (myToken !== refetchCounter) return;
+
+      const payload = {
+        list: result.list,
+        items: fetchedItems,
+        etag: result.etag,
+      };
+
+      if (refetchDeferred) {
+        // Last-write-wins: stash the newest payload, drop any older deferred.
+        bufferedRefetch = payload;
+        if (payload.etag) lastEtag = payload.etag;
+        handleRefetchSuccess();
+        return;
+      }
+
+      list = payload.list;
+      listName = payload.list.name;
+      items = sortItems(payload.items);
+      if (payload.etag) lastEtag = payload.etag;
+      handleRefetchSuccess();
+    } catch {
+      if (myToken !== refetchCounter) return;
+      handleRefetchError();
+    }
+  };
+
+  const onVisibilityChange = () => {
+    if (typeof document !== "undefined" && document.visibilityState === "visible") {
+      void backgroundRefetch();
+    }
+  };
+
+  const onWindowFocus = () => {
+    void backgroundRefetch();
+  };
+
+  onMount(() => {
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", onVisibilityChange);
+    }
+    if (typeof window !== "undefined") {
+      window.addEventListener("focus", onWindowFocus);
+    }
+  });
+
+  onDestroy(() => {
+    if (typeof document !== "undefined") {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    }
+    if (typeof window !== "undefined") {
+      window.removeEventListener("focus", onWindowFocus);
+    }
+    if (bannerTimer) {
+      clearTimeout(bannerTimer);
+      bannerTimer = null;
+    }
+  });
 
   const updateListName = async () => {
     if (!list || savingName || isListCompleted) return;
@@ -424,6 +566,11 @@
 </script>
 
 <main>
+  {#if bannerMounted}
+    <div class="banner offline-banner" role="status" aria-live="polite">
+      Offline — please refresh
+    </div>
+  {/if}
   <header class="page-header">
     <div class="page-header-main">
       <div class="title-with-action">
@@ -443,11 +590,6 @@
         </button>
         <h1>{list ? list.name : "List"}</h1>
       </div>
-      {#if list && ($authStore.user?.admin ?? false)}
-        <button class="button ghost" on:click={() => list && push(`/lists/${list.id}/live`)}>
-          New experience
-        </button>
-      {/if}
     </div>
     <div class="page-header-side">
       <div class="nav-links">

@@ -44,6 +44,10 @@ export const setUnauthorizedHandler = (fn: UnauthorizedHandler | null) => {
   onUnauthorized = fn;
 };
 
+export type GetListResult =
+  | { status: 200; etag: string | null; list: ListOut }
+  | { status: 304; etag: string | null };
+
 async function fetchJson<T>(
   path: string,
   init: RequestInit = {}
@@ -102,6 +106,41 @@ export const api = {
       body: JSON.stringify(payload),
     }),
   getList: (listId: string) => fetchJson<ListOut>(`/lists/${listId}`),
+  getListWithEtag: async (
+    listId: string,
+    ifNoneMatch: string | null
+  ): Promise<GetListResult> => {
+    const headers = new Headers();
+    const token = getToken();
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+    if (ifNoneMatch) headers.set("If-None-Match", ifNoneMatch);
+    const res = await fetch(`${API_BASE_URL}/lists/${listId}`, {
+      cache: "no-store",
+      headers,
+    });
+    if (res.status === 304) {
+      return { status: 304, etag: res.headers.get("ETag") };
+    }
+    if (!res.ok) {
+      if (res.status === 401) onUnauthorized?.();
+      const text = await res.text();
+      let detail: string | undefined;
+      if (text) {
+        try {
+          const parsed = JSON.parse(text) as {
+            detail?: string;
+            message?: string;
+          };
+          detail = parsed.detail || parsed.message;
+        } catch {
+          detail = text;
+        }
+      }
+      throw new ApiError(res.status, "API request failed", detail || res.statusText);
+    }
+    const list = (await res.json()) as ListOut;
+    return { status: 200, etag: res.headers.get("ETag"), list };
+  },
   completeList: (listId: string) =>
     fetchJson<ListOut>(`/lists/${listId}/complete`, {
       method: "POST",
