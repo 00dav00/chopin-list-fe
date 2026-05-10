@@ -40,6 +40,10 @@ export type ListOut = {
   updated_at: string;
 };
 
+export type GetListResult =
+  | { status: 200; etag: string | null; list: ListOut }
+  | { status: 304; etag: string | null };
+
 export type ListCreate = {
   name: string;
   template_id?: string | null;

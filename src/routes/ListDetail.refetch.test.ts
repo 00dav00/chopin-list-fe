@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ListDetail from "./ListDetail.svelte";
 import { makeItem, makeList } from "../test/utils/factories";
 import { authStore } from "../stores/auth";
+import type { UserOut } from "../lib/types";
 
 const { apiMock, TestApiError, pushMock } = vi.hoisted(() => ({
   pushMock: vi.fn(),
@@ -52,16 +53,17 @@ const seedInitialLoad = (overrides: { items?: ReturnType<typeof makeItem>[] } = 
 };
 
 const renderListDetail = async () => {
+  const user: UserOut = {
+    id: "user-1",
+    email: "u@example.com",
+    name: "U",
+    admin: false,
+    created_at: "",
+  };
   authStore.set({
     token: "tok",
     expiry: Date.now() + 60_000,
-    user: {
-      id: "user-1",
-      email: "u@example.com",
-      name: "U",
-      admin: false,
-      created_at: "",
-    } as any,
+    user,
     ready: true,
   });
   const view = render(ListDetail, { params: { listId } });
@@ -117,12 +119,15 @@ describe("ListDetail visibility-gated refetch", () => {
     setVisibility("visible");
     await fireEvent(document, new Event("visibilitychange"));
     await waitFor(() =>
-      expect(apiMock.getListWithEtag).toHaveBeenCalledWith(listId, null)
+      expect(apiMock.getListWithEtag).toHaveBeenCalledWith(
+        listId,
+        null,
+        expect.any(AbortSignal)
+      )
     );
 
-    // The api wrapper is responsible for cache: 'no-store' — assert that
-    // the wrapper itself was invoked, and read the api source asserts the
-    // fetch option in the implementation. Here we additionally verify the
+    // The api wrapper is responsible for cache: 'no-store' — verified by
+    // the dedicated api.test.ts suite. Here we additionally verify the
     // captured ETag is sent on the next refetch.
     apiMock.getListWithEtag.mockClear();
     apiMock.getListWithEtag.mockResolvedValue({
@@ -133,7 +138,8 @@ describe("ListDetail visibility-gated refetch", () => {
     await waitFor(() =>
       expect(apiMock.getListWithEtag).toHaveBeenCalledWith(
         listId,
-        'W/"1700000000000"'
+        'W/"1700000000000"',
+        expect.any(AbortSignal)
       )
     );
   });
@@ -166,11 +172,9 @@ describe("ListDetail visibility-gated refetch", () => {
     expect(screen.queryByText("Offline — please refresh")).toBeNull();
   });
 
-  it("refetch failure → banner mounts after 5s grace", async () => {
+  it("network failure → banner mounts after 5s grace", async () => {
     seedInitialLoad();
-    apiMock.getListWithEtag.mockRejectedValue(
-      new TestApiError(503, "API request failed", "down")
-    );
+    apiMock.getListWithEtag.mockRejectedValue(new Error("network unreachable"));
     await renderListDetail();
 
     await fireEvent(window, new Event("focus"));
@@ -182,6 +186,20 @@ describe("ListDetail visibility-gated refetch", () => {
     await waitFor(() =>
       expect(screen.getByText("Offline — please refresh")).toBeTruthy()
     );
+  });
+
+  it("server error (ApiError) does not mount the offline banner", async () => {
+    seedInitialLoad();
+    apiMock.getListWithEtag.mockRejectedValue(
+      new TestApiError(503, "API request failed", "down")
+    );
+    await renderListDetail();
+
+    await fireEvent(window, new Event("focus"));
+    await waitFor(() => expect(apiMock.getListWithEtag).toHaveBeenCalled());
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(screen.queryByText("Offline — please refresh")).toBeNull();
   });
 
   it("banner clears on 200 after mount", async () => {
@@ -265,8 +283,8 @@ describe("ListDetail visibility-gated refetch", () => {
     await renderListDetail();
 
     // Find a draggable card and start a drag.
-    const card = screen.getByText("Milk").closest('.draggable-item') as HTMLElement;
-    expect(card).toBeTruthy();
+    const card = screen.getByText("Milk").closest(".draggable-item");
+    if (!(card instanceof HTMLElement)) throw new Error("draggable card not found");
 
     await fireEvent.dragStart(card);
 
