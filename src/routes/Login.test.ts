@@ -93,7 +93,7 @@ describe("Login route", () => {
     expect(pushMock).not.toHaveBeenCalledWith("/dashboard");
   });
 
-  it("shows login error when Google sign-in initialization fails", async () => {
+  it("shows login error when Google sign-in container is missing", async () => {
     initGoogleSignInMock.mockImplementation(
       (
         _elementId: string,
