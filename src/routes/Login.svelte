@@ -16,6 +16,7 @@
   } from "../stores/auth";
 
   let error: string | null = null;
+  let timedOut = false;
   let pendingApproval = false;
 
   onMount(() => {
@@ -26,6 +27,7 @@
       "google-signin",
       async (token) => {
         error = null;
+        timedOut = false;
         pendingApproval = false;
         clearPendingApproval();
         saveToken(token);
@@ -46,6 +48,11 @@
       },
       (message) => {
         error = message;
+        timedOut = false;
+      },
+      () => {
+        timedOut = true;
+        error = null;
       }
     );
   });
@@ -69,6 +76,9 @@
         <p><strong>Account pending approval</strong></p>
         <p>Your account has been registered but needs to be approved by an admin before you can sign in. Try signing in again below once you've been notified.</p>
       </div>
+    {:else if timedOut}
+      <p class="meta">Google sign-in didn't load. Reload the page to try again.</p>
+      <button class="button ghost" on:click={() => location.reload()}>Reload page</button>
     {:else if error}
       <p class="meta">{error}</p>
     {/if}
