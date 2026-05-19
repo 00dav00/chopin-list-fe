@@ -45,6 +45,7 @@ describe("Login route", () => {
     expect(initGoogleSignInMock).toHaveBeenCalledWith(
       "google-signin",
       expect.any(Function),
+      expect.any(Function),
       expect.any(Function)
     );
   });
@@ -92,14 +93,14 @@ describe("Login route", () => {
     expect(pushMock).not.toHaveBeenCalledWith("/dashboard");
   });
 
-  it("shows login error when Google sign-in initialization fails", async () => {
+  it("shows login error when Google sign-in container is missing", async () => {
     initGoogleSignInMock.mockImplementation(
       (
         _elementId: string,
         _onSuccess: (token: string) => void,
         onError: (message: string) => void
       ) => {
-        onError("Google sign-in script not loaded.");
+        onError("Sign-in container not found.");
         return () => {};
       }
     );
@@ -109,7 +110,35 @@ describe("Login route", () => {
 
     render(Login);
 
-    expect(await screen.findByText("Google sign-in script not loaded.")).toBeTruthy();
+    expect(await screen.findByText("Sign-in container not found.")).toBeTruthy();
+  });
+
+  it("shows timeout copy and a Reload page button when GIS load times out", async () => {
+    initGoogleSignInMock.mockImplementation(
+      (
+        _elementId: string,
+        _onSuccess: (token: string) => void,
+        _onError: (message: string) => void,
+        onTimeout?: () => void
+      ) => {
+        onTimeout?.();
+        return () => {};
+      }
+    );
+
+    const module = await import("./Login.svelte");
+    Login = module.default;
+
+    render(Login);
+
+    expect(
+      await screen.findByText(
+        "Google sign-in didn't load. Reload the page to try again."
+      )
+    ).toBeTruthy();
+    const reloadButton = await screen.findByRole("button", { name: "Reload page" });
+    expect(reloadButton).toBeTruthy();
+    expect(reloadButton.className).toContain("ghost");
   });
 
   // --- pending-approval persistence ---
