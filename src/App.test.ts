@@ -2,6 +2,14 @@ import { render, screen } from "@testing-library/svelte";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { setRoute, waitForRoute } from "./test/utils/router";
 
+const { initGoogleSignInMock } = vi.hoisted(() => ({
+  initGoogleSignInMock: vi.fn(),
+}));
+
+vi.mock("./lib/auth", () => ({
+  initGoogleSignIn: initGoogleSignInMock,
+}));
+
 const makeJsonResponse = (payload: unknown, status = 200) =>
   new Response(JSON.stringify(payload), {
     status,
@@ -29,6 +37,8 @@ describe("App", () => {
   beforeEach(() => {
     vi.resetModules();
     setRoute("/dashboard");
+    initGoogleSignInMock.mockReset();
+    initGoogleSignInMock.mockReturnValue(() => {});
   });
 
   it("redirects unauthenticated users to /login", async () => {
@@ -74,5 +84,65 @@ describe("App", () => {
       await screen.findByText("Authentication failed. Please sign in again.")
     ).toBeTruthy();
     expect(localStorage.getItem("auth_token")).toBeNull();
+  });
+
+  it("shows pending-approval notice on Login when bootstrapAuth /me returns 403", async () => {
+    setRoute("/dashboard");
+    localStorage.setItem("auth_token", "token-123");
+    localStorage.setItem("auth_expiry", String(Date.now() + 60_000));
+
+    vi.stubGlobal(
+      "fetch",
+      makeFetch({
+        "/me": () =>
+          makeJsonResponse({ detail: "Account pending approval." }, 403),
+        "/me/dashboard": () =>
+          makeJsonResponse({ detail: "Account pending approval." }, 403),
+      })
+    );
+
+    const module = await import("./App.svelte");
+    App = module.default;
+
+    render(App);
+
+    await waitForRoute("/login");
+    expect(await screen.findByText("Account pending approval")).toBeTruthy();
+    expect(
+      await screen.findByText(/Your account has been registered/)
+    ).toBeTruthy();
+    expect(sessionStorage.getItem("auth_pending_approval")).toBe("true");
+    expect(localStorage.getItem("auth_token")).toBeNull();
+  });
+
+  it("shows pending-approval notice after fresh Google sign-in returns 403", async () => {
+    setRoute("/login");
+
+    vi.stubGlobal(
+      "fetch",
+      makeFetch({
+        "/me": () =>
+          makeJsonResponse({ detail: "Account pending approval." }, 403),
+        "/me/dashboard": () =>
+          makeJsonResponse({ detail: "Account pending approval." }, 403),
+      })
+    );
+
+    initGoogleSignInMock.mockImplementation(
+      (_elementId: string, onSuccess: (token: string) => void) => {
+        queueMicrotask(() => onSuccess("jwt-token"));
+        return () => {};
+      }
+    );
+
+    const module = await import("./App.svelte");
+    App = module.default;
+
+    render(App);
+
+    expect(
+      await screen.findByText(/Your account has been registered/)
+    ).toBeTruthy();
+    expect(sessionStorage.getItem("auth_pending_approval")).toBe("true");
   });
 });
