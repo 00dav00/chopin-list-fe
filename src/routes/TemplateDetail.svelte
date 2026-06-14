@@ -20,10 +20,12 @@
   let newItemQty = "1";
   let creatingItem = false;
   let addItemModalOpen = false;
-  // When set, the add-item modal is in "insert above" mode: the new item is
-  // positioned directly above this item id (via create + reorder) instead of
+  // When set, the add-item modal is in "insert" mode: the new item is
+  // positioned relative to this item id (via create + reorder) instead of
   // appended at the end. Null = append (the floating "Add item" flow).
-  let insertAboveItemId: string | null = null;
+  // `insertSide` chooses above vs below the target.
+  let insertTargetId: string | null = null;
+  let insertSide: "above" | "below" = "above";
 
   let editingItemId: string | null = null;
   let editName = "";
@@ -226,7 +228,8 @@
     if (!name) return;
     creatingItem = true;
     error = null;
-    const targetId = insertAboveItemId;
+    const targetId = insertTargetId;
+    const side = insertSide;
     const previousItems = items;
     let created: TemplateItemOut | null = null;
     try {
@@ -236,18 +239,20 @@
         sort_order: nextSortOrder(previousItems),
       });
       if (targetId) {
-        // Insert above target: integer sort_orders are contiguous, so there is
-        // no gap to bisect. Re-emit the full id list with the new item spliced
-        // at the target's index and let the BE renumber 0..N atomically.
+        // Insert relative to target: integer sort_orders are contiguous, so
+        // there is no gap to bisect. Re-emit the full id list with the new item
+        // spliced at the target's index (above) or just after it (below), and
+        // let the BE renumber 0..N atomically. A "below" on the last item lands
+        // at the end (append-equivalent).
         const targetIndex = previousItems.findIndex(
           (item) => item.id === targetId
         );
+        const insertAt =
+          targetIndex < 0
+            ? previousItems.length
+            : targetIndex + (side === "below" ? 1 : 0);
         const reordered = [...previousItems];
-        reordered.splice(
-          targetIndex < 0 ? reordered.length : targetIndex,
-          0,
-          created
-        );
+        reordered.splice(insertAt, 0, created);
         const updated = await api.reorderTemplateItems(
           template.id,
           reordered.map((item) => item.id)
@@ -258,7 +263,7 @@
       }
       newItemName = "";
       newItemQty = "1";
-      insertAboveItemId = null;
+      insertTargetId = null;
       addItemModalOpen = false;
     } catch (err) {
       if (created) {
@@ -272,11 +277,13 @@
         // Local state still appends the item so the list is correct once the
         // error clears.
         items = sortItems([...previousItems, created]);
+        // Neutral / direction-agnostic on purpose: the same failure path fires
+        // for both above and below inserts, so the copy must not name a side.
         error =
-          "Item added, but it couldn't be placed above. It's at the bottom of your list.";
+          "Item added, but it couldn't be placed where you wanted. It's at the bottom of your list.";
         newItemName = "";
         newItemQty = "1";
-        insertAboveItemId = null;
+        insertTargetId = null;
         addItemModalOpen = false;
       } else {
         const message = getApiErrorMessage(err, "Create failed.");
@@ -292,20 +299,21 @@
   const openAddItemModal = () => {
     newItemName = "";
     newItemQty = "1";
-    insertAboveItemId = null;
+    insertTargetId = null;
     addItemModalOpen = true;
   };
 
-  const openInsertAboveModal = (itemId: string) => {
+  const openInsertModal = (itemId: string, side: "above" | "below") => {
     newItemName = "";
     newItemQty = "1";
-    insertAboveItemId = itemId;
+    insertTargetId = itemId;
+    insertSide = side;
     addItemModalOpen = true;
   };
 
   const closeAddItemModal = () => {
     if (creatingItem) return;
-    insertAboveItemId = null;
+    insertTargetId = null;
     addItemModalOpen = false;
   };
 
@@ -620,10 +628,21 @@
                       aria-label={`Insert item above ${item.name}`}
                       title="Insert above"
                       disabled={!!editingItemId || savingItem || reorderingItems}
-                      on:click={() => openInsertAboveModal(item.id)}
+                      on:click={() => openInsertModal(item.id, "above")}
                     >
                       <svg viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M11 2h2v3h3v2h-3v3h-2V7H8V5h3V2zM4 14h16v2H4v-2zm0 4h16v2H4v-2z" />
+                      </svg>
+                    </button>
+                    <button
+                      class="button ghost icon-button"
+                      aria-label={`Insert item below ${item.name}`}
+                      title="Insert below"
+                      disabled={!!editingItemId || savingItem || reorderingItems}
+                      on:click={() => openInsertModal(item.id, "below")}
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M4 4h16v2H4V4zM4 8h16v2H4V8zM11 22H13V19H16V17H13V14H11V17H8V19H11Z" />
                       </svg>
                     </button>
                     <button
@@ -675,7 +694,11 @@
       aria-labelledby="add-template-item-title"
     >
       <h3 id="add-template-item-title">
-        {insertAboveItemId ? "Insert item above" : "Add item"}
+        {insertTargetId
+          ? insertSide === "below"
+            ? "Insert item below"
+            : "Insert item above"
+          : "Add item"}
       </h3>
       <div class="inline-form">
         <input class="input" placeholder="Item name" bind:value={newItemName} />
@@ -713,7 +736,7 @@
         <button class="button" disabled={creatingItem} on:click={createTemplateItem}>
           {creatingItem
             ? "Creating..."
-            : insertAboveItemId
+            : insertTargetId
               ? "Insert item"
               : "Create item"}
         </button>

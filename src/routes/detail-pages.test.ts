@@ -459,6 +459,89 @@ describe.each(detailConfigs)("$name route", (config) => {
     });
   });
 
+  it("inserts an item below a non-last item via create then reorder", async () => {
+    const user = userEvent.setup();
+    const inserted = "After first";
+    config.seedLoadSuccess();
+    apiMock[config.createApi].mockResolvedValue(
+      config.makeEntityItem({ id: config.createdItemId, name: inserted, sort_order: 99 })
+    );
+    apiMock[config.reorderApi].mockResolvedValue([
+      config.makeEntityItem({ id: config.sortedItemIds[0], name: config.sortedItemNames[0], sort_order: 0 }),
+      config.makeEntityItem({ id: config.createdItemId, name: inserted, sort_order: 1 }),
+      config.makeEntityItem({ id: config.sortedItemIds[1], name: config.sortedItemNames[1], sort_order: 2 }),
+    ]);
+
+    render(config.component, { props: config.props });
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: `Insert item below ${config.sortedItemNames[0]}`,
+      })
+    );
+    expect(await screen.findByRole("heading", { name: "Insert item below" })).toBeTruthy();
+    await user.type(await screen.findByPlaceholderText("Item name"), inserted);
+    await user.click(screen.getByRole("button", { name: "Insert item" }));
+
+    await waitFor(() => {
+      // Below the first item → spliced at targetIndex + 1.
+      expect(apiMock[config.reorderApi]).toHaveBeenCalledWith(config.entityId, [
+        config.sortedItemIds[0],
+        config.createdItemId,
+        config.sortedItemIds[1],
+      ]);
+    });
+    await waitFor(() => {
+      const headings = screen
+        .getAllByRole("heading", { level: 3 })
+        .map((heading) => heading.textContent?.trim());
+      expect(headings).toEqual([
+        config.sortedItemNames[0],
+        inserted,
+        config.sortedItemNames[1],
+      ]);
+    });
+  });
+
+  it("inserts an item below the last item, landing it at the end", async () => {
+    const user = userEvent.setup();
+    const inserted = "After last";
+    config.seedLoadSuccess();
+    apiMock[config.createApi].mockResolvedValue(
+      config.makeEntityItem({ id: config.createdItemId, name: inserted, sort_order: 99 })
+    );
+    apiMock[config.reorderApi].mockResolvedValue([
+      config.makeEntityItem({ id: config.sortedItemIds[0], name: config.sortedItemNames[0], sort_order: 0 }),
+      config.makeEntityItem({ id: config.sortedItemIds[1], name: config.sortedItemNames[1], sort_order: 1 }),
+      config.makeEntityItem({ id: config.createdItemId, name: inserted, sort_order: 2 }),
+    ]);
+
+    render(config.component, { props: config.props });
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: `Insert item below ${config.sortedItemNames[1]}`,
+      })
+    );
+    await user.type(await screen.findByPlaceholderText("Item name"), inserted);
+    await user.click(screen.getByRole("button", { name: "Insert item" }));
+
+    await waitFor(() => {
+      // Below the last item → spliced at the end (append-equivalent).
+      expect(apiMock[config.reorderApi]).toHaveBeenCalledWith(config.entityId, [
+        config.sortedItemIds[0],
+        config.sortedItemIds[1],
+        config.createdItemId,
+      ]);
+    });
+    await waitFor(() => {
+      const headings = screen
+        .getAllByRole("heading", { level: 3 })
+        .map((heading) => heading.textContent?.trim());
+      expect(headings).toEqual([...config.sortedItemNames, inserted]);
+    });
+  });
+
   it("reports a partial-success error when repositioning fails after create", async () => {
     const user = userEvent.setup();
     const inserted = "Stranded";
@@ -490,7 +573,7 @@ describe.each(detailConfigs)("$name route", (config) => {
     // refetch reconciles — asserted here so the test documents it on purpose.
     expect(
       await screen.findByText(
-        "Item added, but it couldn't be placed above. It's at the bottom of your list."
+        "Item added, but it couldn't be placed where you wanted. It's at the bottom of your list."
       )
     ).toBeTruthy();
     expect(screen.queryByRole("heading", { level: 3, name: inserted })).toBeNull();
