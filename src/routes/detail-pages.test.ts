@@ -31,6 +31,7 @@ const { pushMock, apiMock, TestApiError } = vi.hoisted(() => ({
     createTemplateItem: vi.fn(),
     updateTemplateItem: vi.fn(),
     deleteTemplateItem: vi.fn(),
+    reorderTemplateItems: vi.fn(),
     createListFromTemplate: vi.fn(),
   },
   TestApiError: class extends Error {
@@ -61,6 +62,14 @@ type DetailConfig = {
   props: { params: { listId?: string; templateId?: string } };
   itemNameForEdit: string;
   sortedItemNames: string[];
+  // Item ids in the same order as sortedItemNames — used to assert the full
+  // id list the insert-above flow re-emits to the reorder endpoint.
+  sortedItemIds: string[];
+  entityId: string;
+  createdItemId: string;
+  createApi: "createItem" | "createTemplateItem";
+  reorderApi: "reorderListItems" | "reorderTemplateItems";
+  makeEntityItem: (opts: Record<string, unknown>) => any;
   notFoundText: string;
   seedLoadSuccess: () => void;
   seedLoadError: (error: unknown) => void;
@@ -127,6 +136,12 @@ const detailConfigs: DetailConfig[] = [
     props: { params: { listId } },
     itemNameForEdit: "Apples",
     sortedItemNames: ["Apples", "Bananas"],
+    sortedItemIds: [listPrimaryItemId, "list-item-2"],
+    entityId: listId,
+    createdItemId: "list-item-created",
+    createApi: "createItem",
+    reorderApi: "reorderListItems",
+    makeEntityItem: (opts) => makeItem({ list_id: listId, ...opts }),
     notFoundText: "List not found.",
     seedLoadSuccess: () => {
       apiMock.getList.mockResolvedValue(listBase);
@@ -193,6 +208,12 @@ const detailConfigs: DetailConfig[] = [
     props: { params: { templateId } },
     itemNameForEdit: "Pasta",
     sortedItemNames: ["Pasta", "Rice"],
+    sortedItemIds: [templatePrimaryItemId, "template-item-2"],
+    entityId: templateId,
+    createdItemId: "template-item-created",
+    createApi: "createTemplateItem",
+    reorderApi: "reorderTemplateItems",
+    makeEntityItem: (opts) => makeTemplateItem({ template_id: templateId, ...opts }),
     notFoundText: "Template not found.",
     seedLoadSuccess: () => {
       apiMock.getTemplate.mockResolvedValue(
@@ -330,6 +351,150 @@ describe.each(detailConfigs)("$name route", (config) => {
       config.assertCreateCalled(newItemName);
     });
     expect(await screen.findByText(newItemName)).toBeTruthy();
+  });
+
+  it("appends via the floating add button without reordering", async () => {
+    const user = userEvent.setup();
+    const newItemName = "Appended item";
+    config.seedLoadSuccess();
+    config.seedCreateItemSuccess(newItemName);
+
+    render(config.component, { props: config.props });
+
+    await user.click(await screen.findByRole("button", { name: "Add item" }));
+    await user.type(await screen.findByPlaceholderText("Item name"), newItemName);
+    await user.click(screen.getByRole("button", { name: "Create item" }));
+
+    await waitFor(() => {
+      config.assertCreateCalled(newItemName);
+    });
+    // Append path must never touch the reorder endpoint (no collateral
+    // renumber of the existing items).
+    expect(apiMock[config.reorderApi]).not.toHaveBeenCalled();
+  });
+
+  it("inserts an item above the first item via create then reorder", async () => {
+    const user = userEvent.setup();
+    const inserted = "Top of list";
+    config.seedLoadSuccess();
+    apiMock[config.createApi].mockResolvedValue(
+      config.makeEntityItem({ id: config.createdItemId, name: inserted, sort_order: 99 })
+    );
+    // Reorder returns the authoritative server order (the AC that matters is
+    // "above on reload", so we assert against the reorder response, not the
+    // optimistic local state).
+    apiMock[config.reorderApi].mockResolvedValue([
+      config.makeEntityItem({ id: config.createdItemId, name: inserted, sort_order: 0 }),
+      config.makeEntityItem({ id: config.sortedItemIds[0], name: config.sortedItemNames[0], sort_order: 1 }),
+      config.makeEntityItem({ id: config.sortedItemIds[1], name: config.sortedItemNames[1], sort_order: 2 }),
+    ]);
+
+    render(config.component, { props: config.props });
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: `Insert item above ${config.sortedItemNames[0]}`,
+      })
+    );
+    expect(await screen.findByRole("heading", { name: "Insert item above" })).toBeTruthy();
+    await user.type(await screen.findByPlaceholderText("Item name"), inserted);
+    await user.click(screen.getByRole("button", { name: "Insert item" }));
+
+    await waitFor(() => {
+      expect(apiMock[config.reorderApi]).toHaveBeenCalledWith(config.entityId, [
+        config.createdItemId,
+        config.sortedItemIds[0],
+        config.sortedItemIds[1],
+      ]);
+    });
+    await waitFor(() => {
+      const headings = screen
+        .getAllByRole("heading", { level: 3 })
+        .map((heading) => heading.textContent?.trim());
+      expect(headings).toEqual([inserted, ...config.sortedItemNames]);
+    });
+  });
+
+  it("inserts an item above a non-first item, leaving other items' order intact", async () => {
+    const user = userEvent.setup();
+    const inserted = "Between";
+    config.seedLoadSuccess();
+    apiMock[config.createApi].mockResolvedValue(
+      config.makeEntityItem({ id: config.createdItemId, name: inserted, sort_order: 99 })
+    );
+    apiMock[config.reorderApi].mockResolvedValue([
+      config.makeEntityItem({ id: config.sortedItemIds[0], name: config.sortedItemNames[0], sort_order: 0 }),
+      config.makeEntityItem({ id: config.createdItemId, name: inserted, sort_order: 1 }),
+      config.makeEntityItem({ id: config.sortedItemIds[1], name: config.sortedItemNames[1], sort_order: 2 }),
+    ]);
+
+    render(config.component, { props: config.props });
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: `Insert item above ${config.sortedItemNames[1]}`,
+      })
+    );
+    await user.type(await screen.findByPlaceholderText("Item name"), inserted);
+    await user.click(screen.getByRole("button", { name: "Insert item" }));
+
+    await waitFor(() => {
+      // Full id list re-emitted with only the new item spliced in — every
+      // existing item present exactly once, relative order preserved.
+      expect(apiMock[config.reorderApi]).toHaveBeenCalledWith(config.entityId, [
+        config.sortedItemIds[0],
+        config.createdItemId,
+        config.sortedItemIds[1],
+      ]);
+    });
+    await waitFor(() => {
+      const headings = screen
+        .getAllByRole("heading", { level: 3 })
+        .map((heading) => heading.textContent?.trim());
+      expect(headings).toEqual([
+        config.sortedItemNames[0],
+        inserted,
+        config.sortedItemNames[1],
+      ]);
+    });
+  });
+
+  it("reports a partial-success error when repositioning fails after create", async () => {
+    const user = userEvent.setup();
+    const inserted = "Stranded";
+    config.seedLoadSuccess();
+    apiMock[config.createApi].mockResolvedValue(
+      config.makeEntityItem({ id: config.createdItemId, name: inserted, sort_order: 99 })
+    );
+    apiMock[config.reorderApi].mockRejectedValue(
+      new TestApiError(500, "API request failed", "Reorder failed.")
+    );
+
+    render(config.component, { props: config.props });
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: `Insert item above ${config.sortedItemNames[0]}`,
+      })
+    );
+    await user.type(await screen.findByPlaceholderText("Item name"), inserted);
+    await user.click(screen.getByRole("button", { name: "Insert item" }));
+
+    await waitFor(() => {
+      expect(apiMock[config.reorderApi]).toHaveBeenCalled();
+    });
+    // v1 surface (intentional): a partial success uses the app-wide
+    // full-screen `error` pattern. Copy is informational (names where the item
+    // landed), not the generic "create failed" and not an impossible drag
+    // instruction. The list is replaced by the error until it clears / a
+    // refetch reconciles — asserted here so the test documents it on purpose.
+    expect(
+      await screen.findByText(
+        "Item added, but it couldn't be placed above. It's at the bottom of your list."
+      )
+    ).toBeTruthy();
+    expect(screen.queryByRole("heading", { level: 3, name: inserted })).toBeNull();
+    expect(screen.queryByText("Create failed.")).toBeNull();
   });
 
   it("edits an existing item", async () => {

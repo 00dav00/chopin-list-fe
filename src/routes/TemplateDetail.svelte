@@ -20,6 +20,10 @@
   let newItemQty = "1";
   let creatingItem = false;
   let addItemModalOpen = false;
+  // When set, the add-item modal is in "insert above" mode: the new item is
+  // positioned directly above this item id (via create + reorder) instead of
+  // appended at the end. Null = append (the floating "Add item" flow).
+  let insertAboveItemId: string | null = null;
 
   let editingItemId: string | null = null;
   let editName = "";
@@ -222,21 +226,63 @@
     if (!name) return;
     creatingItem = true;
     error = null;
+    const targetId = insertAboveItemId;
+    const previousItems = items;
+    let created: TemplateItemOut | null = null;
     try {
-      const payload = {
+      created = await api.createTemplateItem(template.id, {
         name,
         qty: parseOptionalNumber(newItemQty),
-        sort_order: nextSortOrder(items),
-      };
-      const created = await api.createTemplateItem(template.id, payload);
-      items = sortItems([...items, created]);
+        sort_order: nextSortOrder(previousItems),
+      });
+      if (targetId) {
+        // Insert above target: integer sort_orders are contiguous, so there is
+        // no gap to bisect. Re-emit the full id list with the new item spliced
+        // at the target's index and let the BE renumber 0..N atomically.
+        const targetIndex = previousItems.findIndex(
+          (item) => item.id === targetId
+        );
+        const reordered = [...previousItems];
+        reordered.splice(
+          targetIndex < 0 ? reordered.length : targetIndex,
+          0,
+          created
+        );
+        const updated = await api.reorderTemplateItems(
+          template.id,
+          reordered.map((item) => item.id)
+        );
+        items = sortItems(updated);
+      } else {
+        items = sortItems([...previousItems, created]);
+      }
       newItemName = "";
       newItemQty = "1";
+      insertAboveItemId = null;
       addItemModalOpen = false;
     } catch (err) {
-      const message = getApiErrorMessage(err, "Create failed.");
-      if (message) {
-        error = message;
+      if (created) {
+        // Create succeeded but the reposition (reorder) failed — a partial
+        // success: the item exists at the bottom of the template on the
+        // server. Surface it via the app-wide full-screen `error` pattern
+        // (matching every other mutation failure for v1; a non-blocking inline
+        // notice is deferred to a separate cross-cutting ticket). The copy is
+        // purely informational — it names where the item landed and does not
+        // instruct a drag the user can't perform while the list is hidden.
+        // Local state still appends the item so the list is correct once the
+        // error clears.
+        items = sortItems([...previousItems, created]);
+        error =
+          "Item added, but it couldn't be placed above. It's at the bottom of your list.";
+        newItemName = "";
+        newItemQty = "1";
+        insertAboveItemId = null;
+        addItemModalOpen = false;
+      } else {
+        const message = getApiErrorMessage(err, "Create failed.");
+        if (message) {
+          error = message;
+        }
       }
     } finally {
       creatingItem = false;
@@ -246,11 +292,20 @@
   const openAddItemModal = () => {
     newItemName = "";
     newItemQty = "1";
+    insertAboveItemId = null;
+    addItemModalOpen = true;
+  };
+
+  const openInsertAboveModal = (itemId: string) => {
+    newItemName = "";
+    newItemQty = "1";
+    insertAboveItemId = itemId;
     addItemModalOpen = true;
   };
 
   const closeAddItemModal = () => {
     if (creatingItem) return;
+    insertAboveItemId = null;
     addItemModalOpen = false;
   };
 
@@ -562,6 +617,17 @@
                     </button>
                     <button
                       class="button ghost icon-button"
+                      aria-label={`Insert item above ${item.name}`}
+                      title="Insert above"
+                      disabled={!!editingItemId || savingItem || reorderingItems}
+                      on:click={() => openInsertAboveModal(item.id)}
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M11 2h2v3h3v2h-3v3h-2V7H8V5h3V2zM4 14h16v2H4v-2zm0 4h16v2H4v-2z" />
+                      </svg>
+                    </button>
+                    <button
+                      class="button ghost icon-button"
                       aria-label="Edit"
                       title="Edit"
                       on:click={() => startEditItem(item)}
@@ -608,7 +674,9 @@
       aria-modal="true"
       aria-labelledby="add-template-item-title"
     >
-      <h3 id="add-template-item-title">Add item</h3>
+      <h3 id="add-template-item-title">
+        {insertAboveItemId ? "Insert item above" : "Add item"}
+      </h3>
       <div class="inline-form">
         <input class="input" placeholder="Item name" bind:value={newItemName} />
         <div class="qty-stepper">
@@ -643,7 +711,11 @@
           Cancel
         </button>
         <button class="button" disabled={creatingItem} on:click={createTemplateItem}>
-          {creatingItem ? "Creating..." : "Create item"}
+          {creatingItem
+            ? "Creating..."
+            : insertAboveItemId
+              ? "Insert item"
+              : "Create item"}
         </button>
       </div>
     </section>
