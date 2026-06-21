@@ -2,6 +2,7 @@
   import { onDestroy, onMount } from "svelte";
   import { api, ApiError } from "../lib/api";
   import { getApiErrorMessage } from "../lib/errors";
+  import { notify, clearNotices } from "../lib/notices";
   import NavMenu from "../lib/NavMenu.svelte";
   import type { ItemOut, ListOut } from "../lib/types";
   import { authStore } from "../stores/auth";
@@ -169,6 +170,15 @@
     }, BANNER_GRACE_MS);
   };
 
+  // Surface a non-blocking error notice for a failed mutation, with fixed,
+  // human copy. Preserves 401 suppression: a 401 drives the global re-auth
+  // redirect, so getApiErrorMessage returns null for it and we stay silent.
+  const notifyMutationError = (err: unknown, message: string) => {
+    if (getApiErrorMessage(err, message)) {
+      notify({ message, severity: "error" });
+    }
+  };
+
   const loadList = async (listId: string) => {
     loading = true;
     error = null;
@@ -288,6 +298,9 @@
     bufferedRefetch = null;
     draggedItemId = null;
     dragOverItemId = null;
+    // Mutation notices belong to the list being left — clear them so they
+    // don't bleed onto the next list.
+    clearNotices();
   };
 
   onMount(() => {
@@ -315,6 +328,8 @@
       clearTimeout(bannerTimer);
       bannerTimer = null;
     }
+    // Leaving the page entirely — drop any lingering mutation notices.
+    clearNotices();
   });
 
   const updateListName = async () => {
@@ -322,16 +337,12 @@
     const name = listName.trim();
     if (!name) return;
     savingName = true;
-    error = null;
     try {
       list = await api.updateList(list.id, { name });
       listName = list.name;
       renameModalOpen = false;
     } catch (err) {
-      const message = getApiErrorMessage(err, "Update failed.");
-      if (message) {
-        error = message;
-      }
+      notifyMutationError(err, "Couldn't rename the list.");
     } finally {
       savingName = false;
     }
@@ -342,7 +353,6 @@
     const name = newItemName.trim();
     if (!name) return;
     creatingItem = true;
-    error = null;
     const atIndex = insertAtIndex;
     const previousItems = items;
     let created: ItemOut | null = null;
@@ -384,26 +394,22 @@
       if (created) {
         // Create succeeded but the reposition (reorder) failed — a partial
         // success: the item exists at the bottom of the list on the server.
-        // Surface it via the app-wide full-screen `error` pattern (matching
-        // every other mutation failure for v1; a non-blocking inline notice is
-        // deferred to a separate cross-cutting ticket). The copy is purely
-        // informational — it names where the item landed and does not instruct
-        // a drag the user can't perform while the list is hidden. Local state
-        // still appends the item so the list is correct once the error clears.
+        // Surfaced as a persistent WARNING notice (non-blocking) since the
+        // list is still fully visible: the copy regains the guidance the
+        // user needs ("drag it to reorder") now that the list isn't hidden.
+        // Local state appends the item so the list reflects reality.
         items = sortItems([...previousItems, created]);
-        // Neutral / position-agnostic on purpose: the same failure path fires
-        // for every gap insert, so the copy must not name a position.
-        error =
-          "Item added, but it couldn't be placed where you wanted. It's at the bottom of your list.";
+        notify({
+          message:
+            "Item added, but we couldn't place it where you wanted — it's at the bottom. Drag it to reorder.",
+          severity: "warning",
+        });
         newItemName = "";
         newItemQty = "1";
         insertAtIndex = null;
         addItemModalOpen = false;
       } else {
-        const message = getApiErrorMessage(err, "Create failed.");
-        if (message) {
-          error = message;
-        }
+        notifyMutationError(err, "Couldn't add the item. Try again.");
       }
     } finally {
       creatingItem = false;
@@ -525,7 +531,6 @@
 
     items = reordered;
     reorderingItems = true;
-    error = null;
     clearDragState();
 
     try {
@@ -536,10 +541,7 @@
       items = sortItems(updated);
     } catch (err) {
       items = previousItems;
-      const message = getApiErrorMessage(err, "Reorder failed.");
-      if (message) {
-        error = message;
-      }
+      notifyMutationError(err, "Couldn't save the new order — your list is back to how it was.");
     } finally {
       reorderingItems = false;
     }
@@ -552,7 +554,6 @@
       !!targetItem && !targetItem.purchased && unpurchasedItems.length === 1;
 
     togglingItemId = itemId;
-    error = null;
     try {
       const updated = await api.toggleItem(itemId);
       items = sortItems(
@@ -562,10 +563,7 @@
         completeSuggestionModalOpen = true;
       }
     } catch (err) {
-      const message = getApiErrorMessage(err, "Toggle failed.");
-      if (message) {
-        error = message;
-      }
+      notifyMutationError(err, "Couldn't update that item. Try again.");
     } finally {
       togglingItemId = null;
     }
@@ -574,15 +572,11 @@
   const deleteItem = async (itemId: string) => {
     if (isListCompleted) return;
     if (!window.confirm("Delete this item?")) return;
-    error = null;
     try {
       await api.deleteItem(itemId);
       items = items.filter((item) => item.id !== itemId);
     } catch (err) {
-      const message = getApiErrorMessage(err, "Delete failed.");
-      if (message) {
-        error = message;
-      }
+      notifyMutationError(err, "Couldn't delete that item. Try again.");
     }
   };
 
@@ -594,7 +588,6 @@
     if (nextQty === currentQty) return;
 
     updatingQtyItemId = item.id;
-    error = null;
     try {
       const updated = await api.updateItem(item.id, {
         name: item.name,
@@ -604,10 +597,7 @@
         items.map((entry) => (entry.id === item.id ? updated : entry))
       );
     } catch (err) {
-      const message = getApiErrorMessage(err, "Update failed.");
-      if (message) {
-        error = message;
-      }
+      notifyMutationError(err, "Couldn't change the quantity. Try again.");
     } finally {
       updatingQtyItemId = null;
     }
@@ -629,7 +619,6 @@
     const name = editName.trim();
     if (!name) return;
     savingItem = true;
-    error = null;
     try {
       const payload = {
         name,
@@ -641,10 +630,7 @@
       );
       editingItemId = null;
     } catch (err) {
-      const message = getApiErrorMessage(err, "Update failed.");
-      if (message) {
-        error = message;
-      }
+      notifyMutationError(err, "Couldn't save your changes. Try again.");
     } finally {
       savingItem = false;
     }
@@ -653,15 +639,11 @@
   const completeCurrentList = async () => {
     if (!list || completingList || activatingList) return;
     completingList = true;
-    error = null;
     try {
       list = await api.completeList(list.id);
       completeSuggestionModalOpen = false;
     } catch (err) {
-      const message = getApiErrorMessage(err, "Complete failed.");
-      if (message) {
-        error = message;
-      }
+      notifyMutationError(err, "Couldn't update the list. Try again.");
     } finally {
       completingList = false;
     }
@@ -670,15 +652,11 @@
   const activateCurrentList = async () => {
     if (!list || activatingList || completingList) return;
     activatingList = true;
-    error = null;
     try {
       list = await api.activateList(list.id);
       completeSuggestionModalOpen = false;
     } catch (err) {
-      const message = getApiErrorMessage(err, "Activate failed.");
-      if (message) {
-        error = message;
-      }
+      notifyMutationError(err, "Couldn't update the list. Try again.");
     } finally {
       activatingList = false;
     }
