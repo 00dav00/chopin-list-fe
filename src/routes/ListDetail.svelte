@@ -427,11 +427,13 @@
   };
 
   // Per-gap accessible label, named by the neighbours the gap sits between.
-  // Gap i sits above unpurchasedItems[i]; index 0 has no item above it.
+  // Gap i sits above unpurchasedItems[i]; index 0 has no item above it. The
+  // name leads with the visible "Insert here" text so the accessible name
+  // contains the visible label (WCAG 2.5.3 Label-in-Name).
   const gapAriaLabel = (index: number) => {
     const below = unpurchasedItems[index];
-    if (index <= 0) return `Insert before ${below.name}`;
-    return `Insert between ${unpurchasedItems[index - 1].name} and ${below.name}`;
+    if (index <= 0) return `Insert here, before ${below.name}`;
+    return `Insert here, between ${unpurchasedItems[index - 1].name} and ${below.name}`;
   };
 
   const openRenameModal = () => {
@@ -781,7 +783,7 @@
               class="insert-gap"
               aria-label={gapAriaLabel(i)}
               title="Insert here"
-              disabled={isListCompleted}
+              disabled={isListCompleted || editingItemId !== null || reorderingItems}
               on:click={() => openInsertGap(i)}
             >
               <span class="insert-gap-line" aria-hidden="true"></span>

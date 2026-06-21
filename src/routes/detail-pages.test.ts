@@ -385,10 +385,10 @@ describe.each(detailConfigs)("$name route", (config) => {
     const gapLabels = screen
       .getAllByRole("button")
       .map((button) => button.getAttribute("aria-label") ?? "")
-      .filter((label) => /^Insert (before|between)\b/.test(label));
+      .filter((label) => /^Insert here, (before|between)\b/.test(label));
     expect(gapLabels).toEqual([
-      `Insert before ${config.sortedItemNames[0]}`,
-      `Insert between ${config.sortedItemNames[0]} and ${config.sortedItemNames[1]}`,
+      `Insert here, before ${config.sortedItemNames[0]}`,
+      `Insert here, between ${config.sortedItemNames[0]} and ${config.sortedItemNames[1]}`,
     ]);
   });
 
@@ -412,7 +412,7 @@ describe.each(detailConfigs)("$name route", (config) => {
 
     await user.click(
       await screen.findByRole("button", {
-        name: `Insert before ${config.sortedItemNames[0]}`,
+        name: `Insert here, before ${config.sortedItemNames[0]}`,
       })
     );
     expect(await screen.findByRole("heading", { name: "Insert item" })).toBeTruthy();
@@ -451,7 +451,7 @@ describe.each(detailConfigs)("$name route", (config) => {
 
     await user.click(
       await screen.findByRole("button", {
-        name: `Insert between ${config.sortedItemNames[0]} and ${config.sortedItemNames[1]}`,
+        name: `Insert here, between ${config.sortedItemNames[0]} and ${config.sortedItemNames[1]}`,
       })
     );
     await user.type(await screen.findByPlaceholderText("Item name"), inserted);
@@ -493,7 +493,7 @@ describe.each(detailConfigs)("$name route", (config) => {
 
     await user.click(
       await screen.findByRole("button", {
-        name: `Insert before ${config.sortedItemNames[0]}`,
+        name: `Insert here, before ${config.sortedItemNames[0]}`,
       })
     );
     await user.type(await screen.findByPlaceholderText("Item name"), inserted);
