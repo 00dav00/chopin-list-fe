@@ -20,6 +20,12 @@
   let newItemQty = "1";
   let creatingItem = false;
   let addItemModalOpen = false;
+  // When set, the add-item modal is in "insert" mode: the new item lands at
+  // this position (via create + reorder) instead of appended at the end.
+  // The value is an index into `items` — gap i sits above items[i], so 0 =
+  // before the first item and N-1 = before the last. There is no gap at index
+  // N; appending stays on the floating "Add item" button. Null = append.
+  let insertAtIndex: number | null = null;
 
   let editingItemId: string | null = null;
   let editName = "";
@@ -222,21 +228,59 @@
     if (!name) return;
     creatingItem = true;
     error = null;
+    const atIndex = insertAtIndex;
+    const previousItems = items;
+    let created: TemplateItemOut | null = null;
     try {
-      const payload = {
+      created = await api.createTemplateItem(template.id, {
         name,
         qty: parseOptionalNumber(newItemQty),
-        sort_order: nextSortOrder(items),
-      };
-      const created = await api.createTemplateItem(template.id, payload);
-      items = sortItems([...items, created]);
+        sort_order: nextSortOrder(previousItems),
+      });
+      if (atIndex !== null) {
+        // Gap insert: `atIndex` is a position in the item list. Splice the new
+        // item in there and re-emit the full id list so the BE renumbers
+        // 0..N atomically.
+        const insertAt = Math.max(0, Math.min(atIndex, previousItems.length));
+        const reordered = [...previousItems];
+        reordered.splice(insertAt, 0, created);
+        const updated = await api.reorderTemplateItems(
+          template.id,
+          reordered.map((item) => item.id)
+        );
+        items = sortItems(updated);
+      } else {
+        items = sortItems([...previousItems, created]);
+      }
       newItemName = "";
       newItemQty = "1";
+      insertAtIndex = null;
       addItemModalOpen = false;
     } catch (err) {
-      const message = getApiErrorMessage(err, "Create failed.");
-      if (message) {
-        error = message;
+      if (created) {
+        // Create succeeded but the reposition (reorder) failed — a partial
+        // success: the item exists at the bottom of the template on the
+        // server. Surface it via the app-wide full-screen `error` pattern
+        // (matching every other mutation failure for v1; a non-blocking inline
+        // notice is deferred to a separate cross-cutting ticket). The copy is
+        // purely informational — it names where the item landed and does not
+        // instruct a drag the user can't perform while the list is hidden.
+        // Local state still appends the item so the list is correct once the
+        // error clears.
+        items = sortItems([...previousItems, created]);
+        // Neutral / position-agnostic on purpose: the same failure path fires
+        // for every gap insert, so the copy must not name a position.
+        error =
+          "Item added, but it couldn't be placed where you wanted. It's at the bottom of your template.";
+        newItemName = "";
+        newItemQty = "1";
+        insertAtIndex = null;
+        addItemModalOpen = false;
+      } else {
+        const message = getApiErrorMessage(err, "Create failed.");
+        if (message) {
+          error = message;
+        }
       }
     } finally {
       creatingItem = false;
@@ -246,11 +290,30 @@
   const openAddItemModal = () => {
     newItemName = "";
     newItemQty = "1";
+    insertAtIndex = null;
     addItemModalOpen = true;
+  };
+
+  const openInsertGap = (index: number) => {
+    newItemName = "";
+    newItemQty = "1";
+    insertAtIndex = index;
+    addItemModalOpen = true;
+  };
+
+  // Per-gap accessible label, named by the neighbours the gap sits between.
+  // Gap i sits above items[i]; index 0 has no item above it. The name leads
+  // with the visible "Insert here" text so the accessible name contains the
+  // visible label (WCAG 2.5.3 Label-in-Name).
+  const gapAriaLabel = (index: number) => {
+    const below = items[index];
+    if (index <= 0) return `Insert here, before ${below.name}`;
+    return `Insert here, between ${items[index - 1].name} and ${below.name}`;
   };
 
   const closeAddItemModal = () => {
     if (creatingItem) return;
+    insertAtIndex = null;
     addItemModalOpen = false;
   };
 
@@ -454,7 +517,19 @@
         <p class="meta">No items yet.</p>
       {:else}
         <div class="stack">
-          {#each items as item (item.id)}
+          {#each items as item, i (item.id)}
+            <button
+              type="button"
+              class="insert-gap"
+              aria-label={gapAriaLabel(i)}
+              title="Insert here"
+              disabled={!!editingItemId || savingItem || reorderingItems}
+              on:click={() => openInsertGap(i)}
+            >
+              <span class="insert-gap-line" aria-hidden="true"></span>
+              <span class="insert-gap-plus" aria-hidden="true">+</span>
+              <span class="insert-gap-label">Insert here</span>
+            </button>
             <div
               class="card draggable-item"
               class:drag-over={dragOverItemId === item.id}
@@ -608,7 +683,9 @@
       aria-modal="true"
       aria-labelledby="add-template-item-title"
     >
-      <h3 id="add-template-item-title">Add item</h3>
+      <h3 id="add-template-item-title">
+        {insertAtIndex !== null ? "Insert item" : "Add item"}
+      </h3>
       <div class="inline-form">
         <input class="input" placeholder="Item name" bind:value={newItemName} />
         <div class="qty-stepper">
@@ -643,7 +720,11 @@
           Cancel
         </button>
         <button class="button" disabled={creatingItem} on:click={createTemplateItem}>
-          {creatingItem ? "Creating..." : "Create item"}
+          {creatingItem
+            ? "Creating..."
+            : insertAtIndex !== null
+              ? "Insert item"
+              : "Create item"}
         </button>
       </div>
     </section>
@@ -694,3 +775,78 @@
     </section>
   </div>
 {/if}
+
+<style>
+  /* In-gap "Insert here" affordance. Always rendered (no hover dependency, so
+     it works on touch); resting state is low-contrast so it reads as spacing,
+     not chrome. The transparent padding gives a >=44px touch target around the
+     hairline. */
+  .insert-gap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    width: 100%;
+    min-height: 44px;
+    padding: 0.4rem 0;
+    /* Overlap the surrounding .stack gap (1rem) so the 44px hit area does not
+       add a full row of height per item — keeps long lists from ~doubling in
+       scroll length while preserving the touch target. The 11px overlap stays
+       inside the stack whitespace, so it does not intercept taps on the card. */
+    margin: -0.7rem 0;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    opacity: 0.45;
+    cursor: pointer;
+    transition: opacity 0.12s ease, color 0.12s ease;
+  }
+  .insert-gap-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 1px;
+    background: currentColor;
+    opacity: 0.4;
+  }
+  /* The "+" and label sit on a card-coloured chip so the hairline reads as
+     broken behind them rather than striking through the glyph. */
+  .insert-gap-plus,
+  .insert-gap-label {
+    position: relative;
+    z-index: 1;
+    background: var(--card);
+    padding: 0 0.4rem;
+  }
+  .insert-gap-plus {
+    font-size: 1.1rem;
+    line-height: 1;
+  }
+  .insert-gap-label {
+    font-size: 0.8rem;
+    opacity: 0;
+    transition: opacity 0.12s ease;
+  }
+  .insert-gap:hover,
+  .insert-gap:focus-visible {
+    opacity: 1;
+    color: var(--accent);
+  }
+  .insert-gap:hover .insert-gap-label,
+  .insert-gap:focus-visible .insert-gap-label {
+    opacity: 1;
+  }
+  .insert-gap:disabled {
+    cursor: default;
+    opacity: 0.2;
+    color: var(--muted);
+  }
+  /* Touch devices have no hover: keep it visible without a hover reveal. */
+  @media (hover: none) {
+    .insert-gap {
+      opacity: 0.55;
+    }
+  }
+</style>
