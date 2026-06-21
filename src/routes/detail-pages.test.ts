@@ -63,7 +63,7 @@ type DetailConfig = {
   itemNameForEdit: string;
   sortedItemNames: string[];
   // Item ids in the same order as sortedItemNames — used to assert the full
-  // id list the insert-above flow re-emits to the reorder endpoint.
+  // id list the gap-insert flow re-emits to the reorder endpoint.
   sortedItemIds: string[];
   entityId: string;
   createdItemId: string;
@@ -373,7 +373,26 @@ describe.each(detailConfigs)("$name route", (config) => {
     expect(apiMock[config.reorderApi]).not.toHaveBeenCalled();
   });
 
-  it("inserts an item above the first item via create then reorder", async () => {
+  it("renders one insert gap above each item and none after the last", async () => {
+    config.seedLoadSuccess();
+
+    render(config.component, { props: config.props });
+
+    await screen.findByText(config.sortedItemNames[0]);
+
+    // N items → N gaps, one above each item. There is NO trailing gap after
+    // the last item — appending is the floating "Add item" button's job.
+    const gapLabels = screen
+      .getAllByRole("button")
+      .map((button) => button.getAttribute("aria-label") ?? "")
+      .filter((label) => /^Insert (before|between)\b/.test(label));
+    expect(gapLabels).toEqual([
+      `Insert before ${config.sortedItemNames[0]}`,
+      `Insert between ${config.sortedItemNames[0]} and ${config.sortedItemNames[1]}`,
+    ]);
+  });
+
+  it("inserts an item at the top gap, before the first item", async () => {
     const user = userEvent.setup();
     const inserted = "Top of list";
     config.seedLoadSuccess();
@@ -381,7 +400,7 @@ describe.each(detailConfigs)("$name route", (config) => {
       config.makeEntityItem({ id: config.createdItemId, name: inserted, sort_order: 99 })
     );
     // Reorder returns the authoritative server order (the AC that matters is
-    // "above on reload", so we assert against the reorder response, not the
+    // "first on reload", so we assert against the reorder response, not the
     // optimistic local state).
     apiMock[config.reorderApi].mockResolvedValue([
       config.makeEntityItem({ id: config.createdItemId, name: inserted, sort_order: 0 }),
@@ -393,10 +412,10 @@ describe.each(detailConfigs)("$name route", (config) => {
 
     await user.click(
       await screen.findByRole("button", {
-        name: `Insert item above ${config.sortedItemNames[0]}`,
+        name: `Insert before ${config.sortedItemNames[0]}`,
       })
     );
-    expect(await screen.findByRole("heading", { name: "Insert item above" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Insert item" })).toBeTruthy();
     await user.type(await screen.findByPlaceholderText("Item name"), inserted);
     await user.click(screen.getByRole("button", { name: "Insert item" }));
 
@@ -415,7 +434,7 @@ describe.each(detailConfigs)("$name route", (config) => {
     });
   });
 
-  it("inserts an item above a non-first item, leaving other items' order intact", async () => {
+  it("inserts an item in the gap between two items, leaving other items' order intact", async () => {
     const user = userEvent.setup();
     const inserted = "Between";
     config.seedLoadSuccess();
@@ -432,7 +451,7 @@ describe.each(detailConfigs)("$name route", (config) => {
 
     await user.click(
       await screen.findByRole("button", {
-        name: `Insert item above ${config.sortedItemNames[1]}`,
+        name: `Insert between ${config.sortedItemNames[0]} and ${config.sortedItemNames[1]}`,
       })
     );
     await user.type(await screen.findByPlaceholderText("Item name"), inserted);
@@ -459,89 +478,6 @@ describe.each(detailConfigs)("$name route", (config) => {
     });
   });
 
-  it("inserts an item below a non-last item via create then reorder", async () => {
-    const user = userEvent.setup();
-    const inserted = "After first";
-    config.seedLoadSuccess();
-    apiMock[config.createApi].mockResolvedValue(
-      config.makeEntityItem({ id: config.createdItemId, name: inserted, sort_order: 99 })
-    );
-    apiMock[config.reorderApi].mockResolvedValue([
-      config.makeEntityItem({ id: config.sortedItemIds[0], name: config.sortedItemNames[0], sort_order: 0 }),
-      config.makeEntityItem({ id: config.createdItemId, name: inserted, sort_order: 1 }),
-      config.makeEntityItem({ id: config.sortedItemIds[1], name: config.sortedItemNames[1], sort_order: 2 }),
-    ]);
-
-    render(config.component, { props: config.props });
-
-    await user.click(
-      await screen.findByRole("button", {
-        name: `Insert item below ${config.sortedItemNames[0]}`,
-      })
-    );
-    expect(await screen.findByRole("heading", { name: "Insert item below" })).toBeTruthy();
-    await user.type(await screen.findByPlaceholderText("Item name"), inserted);
-    await user.click(screen.getByRole("button", { name: "Insert item" }));
-
-    await waitFor(() => {
-      // Below the first item → spliced at targetIndex + 1.
-      expect(apiMock[config.reorderApi]).toHaveBeenCalledWith(config.entityId, [
-        config.sortedItemIds[0],
-        config.createdItemId,
-        config.sortedItemIds[1],
-      ]);
-    });
-    await waitFor(() => {
-      const headings = screen
-        .getAllByRole("heading", { level: 3 })
-        .map((heading) => heading.textContent?.trim());
-      expect(headings).toEqual([
-        config.sortedItemNames[0],
-        inserted,
-        config.sortedItemNames[1],
-      ]);
-    });
-  });
-
-  it("inserts an item below the last item, landing it at the end", async () => {
-    const user = userEvent.setup();
-    const inserted = "After last";
-    config.seedLoadSuccess();
-    apiMock[config.createApi].mockResolvedValue(
-      config.makeEntityItem({ id: config.createdItemId, name: inserted, sort_order: 99 })
-    );
-    apiMock[config.reorderApi].mockResolvedValue([
-      config.makeEntityItem({ id: config.sortedItemIds[0], name: config.sortedItemNames[0], sort_order: 0 }),
-      config.makeEntityItem({ id: config.sortedItemIds[1], name: config.sortedItemNames[1], sort_order: 1 }),
-      config.makeEntityItem({ id: config.createdItemId, name: inserted, sort_order: 2 }),
-    ]);
-
-    render(config.component, { props: config.props });
-
-    await user.click(
-      await screen.findByRole("button", {
-        name: `Insert item below ${config.sortedItemNames[1]}`,
-      })
-    );
-    await user.type(await screen.findByPlaceholderText("Item name"), inserted);
-    await user.click(screen.getByRole("button", { name: "Insert item" }));
-
-    await waitFor(() => {
-      // Below the last item → spliced at the end (append-equivalent).
-      expect(apiMock[config.reorderApi]).toHaveBeenCalledWith(config.entityId, [
-        config.sortedItemIds[0],
-        config.sortedItemIds[1],
-        config.createdItemId,
-      ]);
-    });
-    await waitFor(() => {
-      const headings = screen
-        .getAllByRole("heading", { level: 3 })
-        .map((heading) => heading.textContent?.trim());
-      expect(headings).toEqual([...config.sortedItemNames, inserted]);
-    });
-  });
-
   it("reports a partial-success error when repositioning fails after create", async () => {
     const user = userEvent.setup();
     const inserted = "Stranded";
@@ -557,7 +493,7 @@ describe.each(detailConfigs)("$name route", (config) => {
 
     await user.click(
       await screen.findByRole("button", {
-        name: `Insert item above ${config.sortedItemNames[0]}`,
+        name: `Insert before ${config.sortedItemNames[0]}`,
       })
     );
     await user.type(await screen.findByPlaceholderText("Item name"), inserted);

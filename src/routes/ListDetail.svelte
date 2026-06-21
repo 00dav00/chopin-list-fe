@@ -27,12 +27,13 @@
   let newItemQty = "1";
   let creatingItem = false;
   let addItemModalOpen = false;
-  // When set, the add-item modal is in "insert" mode: the new item is
-  // positioned relative to this item id (via create + reorder) instead of
-  // appended at the end. Null = append (the floating "Add item" flow).
-  // `insertSide` chooses above vs below the target.
-  let insertTargetId: string | null = null;
-  let insertSide: "above" | "below" = "above";
+  // When set, the add-item modal is in "insert" mode: the new item lands at
+  // this position (via create + reorder) instead of appended at the end.
+  // The value is an index into `unpurchasedItems` — gap i sits above
+  // unpurchasedItems[i], so 0 = before the first item and N-1 = before the
+  // last. There is no gap at index N; appending stays on the floating
+  // "Add item" button. Null = append.
+  let insertAtIndex: number | null = null;
 
   let editingItemId: string | null = null;
   let editName = "";
@@ -342,8 +343,7 @@
     if (!name) return;
     creatingItem = true;
     error = null;
-    const targetId = insertTargetId;
-    const side = insertSide;
+    const atIndex = insertAtIndex;
     const previousItems = items;
     let created: ItemOut | null = null;
     try {
@@ -352,24 +352,25 @@
         qty: parseOptionalNumber(newItemQty),
         sort_order: nextSortOrder(previousItems),
       });
-      if (targetId) {
-        // Insert relative to target: integer sort_orders are contiguous, so
-        // there is no gap to bisect. Re-emit the full id list with the new item
-        // spliced at the target's index (above) or just after it (below), and
-        // let the BE renumber 0..N atomically. A "below" on the last item lands
-        // at the end (append-equivalent).
-        const targetIndex = previousItems.findIndex(
-          (item) => item.id === targetId
+      if (atIndex !== null) {
+        // Gap insert: `atIndex` is a position in the unpurchased list. Splice
+        // the new item in there, then re-emit the full id list as
+        // [...unpurchased, ...purchased] so the BE renumbers 0..N atomically.
+        // Purchased items keep their relative order and trail the unpurchased
+        // ones (they already render in a separate section, so this only
+        // normalizes their sort_order — no visible move).
+        const reorderedUnpurchased = previousItems.filter(
+          (item) => !item.purchased
         );
-        const insertAt =
-          targetIndex < 0
-            ? previousItems.length
-            : targetIndex + (side === "below" ? 1 : 0);
-        const reordered = [...previousItems];
-        reordered.splice(insertAt, 0, created);
+        const insertAt = Math.max(
+          0,
+          Math.min(atIndex, reorderedUnpurchased.length)
+        );
+        reorderedUnpurchased.splice(insertAt, 0, created);
+        const purchased = previousItems.filter((item) => item.purchased);
         const updated = await api.reorderListItems(
           list.id,
-          reordered.map((item) => item.id)
+          [...reorderedUnpurchased, ...purchased].map((item) => item.id)
         );
         items = sortItems(updated);
       } else {
@@ -377,7 +378,7 @@
       }
       newItemName = "";
       newItemQty = "1";
-      insertTargetId = null;
+      insertAtIndex = null;
       addItemModalOpen = false;
     } catch (err) {
       if (created) {
@@ -390,13 +391,13 @@
         // a drag the user can't perform while the list is hidden. Local state
         // still appends the item so the list is correct once the error clears.
         items = sortItems([...previousItems, created]);
-        // Neutral / direction-agnostic on purpose: the same failure path fires
-        // for both above and below inserts, so the copy must not name a side.
+        // Neutral / position-agnostic on purpose: the same failure path fires
+        // for every gap insert, so the copy must not name a position.
         error =
           "Item added, but it couldn't be placed where you wanted. It's at the bottom of your list.";
         newItemName = "";
         newItemQty = "1";
-        insertTargetId = null;
+        insertAtIndex = null;
         addItemModalOpen = false;
       } else {
         const message = getApiErrorMessage(err, "Create failed.");
@@ -413,17 +414,24 @@
     if (isListCompleted) return;
     newItemName = "";
     newItemQty = "1";
-    insertTargetId = null;
+    insertAtIndex = null;
     addItemModalOpen = true;
   };
 
-  const openInsertModal = (itemId: string, side: "above" | "below") => {
+  const openInsertGap = (index: number) => {
     if (isListCompleted) return;
     newItemName = "";
     newItemQty = "1";
-    insertTargetId = itemId;
-    insertSide = side;
+    insertAtIndex = index;
     addItemModalOpen = true;
+  };
+
+  // Per-gap accessible label, named by the neighbours the gap sits between.
+  // Gap i sits above unpurchasedItems[i]; index 0 has no item above it.
+  const gapAriaLabel = (index: number) => {
+    const below = unpurchasedItems[index];
+    if (index <= 0) return `Insert before ${below.name}`;
+    return `Insert between ${unpurchasedItems[index - 1].name} and ${below.name}`;
   };
 
   const openRenameModal = () => {
@@ -439,7 +447,7 @@
 
   const closeAddItemModal = () => {
     if (creatingItem) return;
-    insertTargetId = null;
+    insertAtIndex = null;
     addItemModalOpen = false;
   };
 
@@ -767,7 +775,19 @@
         <p class="meta">No items yet.</p>
       {:else}
         <div class="stack">
-          {#each unpurchasedItems as item (item.id)}
+          {#each unpurchasedItems as item, i (item.id)}
+            <button
+              type="button"
+              class="insert-gap"
+              aria-label={gapAriaLabel(i)}
+              title="Insert here"
+              disabled={isListCompleted}
+              on:click={() => openInsertGap(i)}
+            >
+              <span class="insert-gap-line" aria-hidden="true"></span>
+              <span class="insert-gap-plus" aria-hidden="true">+</span>
+              <span class="insert-gap-label">Insert here</span>
+            </button>
             <div
               class="card draggable-item"
               class:drag-over={dragOverItemId === item.id}
@@ -875,28 +895,6 @@
                     </button>
                     <button
                       class="button ghost icon-button"
-                      aria-label={`Insert item above ${item.name}`}
-                      title="Insert above"
-                      disabled={isListCompleted}
-                      on:click={() => openInsertModal(item.id, "above")}
-                    >
-                      <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M11 2h2v3h3v2h-3v3h-2V7H8V5h3V2zM4 14h16v2H4v-2zm0 4h16v2H4v-2z" />
-                      </svg>
-                    </button>
-                    <button
-                      class="button ghost icon-button"
-                      aria-label={`Insert item below ${item.name}`}
-                      title="Insert below"
-                      disabled={isListCompleted}
-                      on:click={() => openInsertModal(item.id, "below")}
-                    >
-                      <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M4 4h16v2H4V4zM4 8h16v2H4V8zM11 22H13V19H16V17H13V14H11V17H8V19H11Z" />
-                      </svg>
-                    </button>
-                    <button
-                      class="button ghost icon-button"
                       aria-label="Edit"
                       title="Edit"
                       disabled={isListCompleted}
@@ -993,11 +991,7 @@
       aria-labelledby="add-list-item-title"
     >
       <h3 id="add-list-item-title">
-        {insertTargetId
-          ? insertSide === "below"
-            ? "Insert item below"
-            : "Insert item above"
-          : "Add item"}
+        {insertAtIndex !== null ? "Insert item" : "Add item"}
       </h3>
       <div class="inline-form">
         <input class="input" placeholder="Item name" bind:value={newItemName} />
@@ -1035,7 +1029,7 @@
         <button class="button" disabled={creatingItem} on:click={createItem}>
           {creatingItem
             ? "Creating..."
-            : insertTargetId
+            : insertAtIndex !== null
               ? "Insert item"
               : "Create item"}
         </button>
@@ -1087,3 +1081,73 @@
     </section>
   </div>
 {/if}
+
+<style>
+  /* In-gap "Insert here" affordance. Always rendered (no hover dependency, so
+     it works on touch); resting state is low-contrast so it reads as spacing,
+     not chrome. The transparent padding gives a >=44px touch target around the
+     hairline. */
+  .insert-gap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    width: 100%;
+    min-height: 44px;
+    padding: 0.4rem 0;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    opacity: 0.45;
+    cursor: pointer;
+    transition: opacity 0.12s ease, color 0.12s ease;
+  }
+  .insert-gap-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 1px;
+    background: currentColor;
+    opacity: 0.4;
+  }
+  /* The "+" and label sit on a card-coloured chip so the hairline reads as
+     broken behind them rather than striking through the glyph. */
+  .insert-gap-plus,
+  .insert-gap-label {
+    position: relative;
+    z-index: 1;
+    background: var(--card);
+    padding: 0 0.4rem;
+  }
+  .insert-gap-plus {
+    font-size: 1.1rem;
+    line-height: 1;
+  }
+  .insert-gap-label {
+    font-size: 0.8rem;
+    opacity: 0;
+    transition: opacity 0.12s ease;
+  }
+  .insert-gap:hover,
+  .insert-gap:focus-visible {
+    opacity: 1;
+    color: var(--accent);
+  }
+  .insert-gap:hover .insert-gap-label,
+  .insert-gap:focus-visible .insert-gap-label {
+    opacity: 1;
+  }
+  .insert-gap:disabled {
+    cursor: default;
+    opacity: 0.2;
+    color: var(--muted);
+  }
+  /* Touch devices have no hover: keep it visible without a hover reveal. */
+  @media (hover: none) {
+    .insert-gap {
+      opacity: 0.55;
+    }
+  }
+</style>
