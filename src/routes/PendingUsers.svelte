@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { push } from "svelte-spa-router";
   import { api } from "../lib/api";
+  import ConfirmDialog from "../lib/ConfirmDialog.svelte";
   import { getApiErrorMessage } from "../lib/errors";
   import NavMenu from "../lib/NavMenu.svelte";
   import type { PendingUserOut } from "../lib/types";
@@ -12,6 +13,7 @@
   let error: string | null = null;
   let approvingId: string | null = null;
   let deletingId: string | null = null;
+  let pendingDeleteUserId: string | null = null;
 
   const formatDate = (value: string) => new Date(value).toLocaleDateString();
 
@@ -52,14 +54,25 @@
     }
   };
 
-  const deletePendingUser = async (userId: string) => {
+  const requestDeletePendingUser = (userId: string) => {
     if (approvingId || deletingId) return;
-    if (!window.confirm("Delete this pending user and all their data?")) return;
+    pendingDeleteUserId = userId;
+  };
+
+  const cancelDeletePendingUser = () => {
+    if (deletingId) return;
+    pendingDeleteUserId = null;
+  };
+
+  const confirmDeletePendingUser = async () => {
+    const userId = pendingDeleteUserId;
+    if (!userId || approvingId || deletingId) return;
     deletingId = userId;
     error = null;
     try {
       await api.deletePendingUser(userId);
       pendingUsers = pendingUsers.filter((user) => user.id !== userId);
+      pendingDeleteUserId = null;
     } catch (err) {
       const message = getApiErrorMessage(err, "Delete failed.");
       if (message) {
@@ -114,7 +127,7 @@
             <button
               class="button danger"
               disabled={approvingId === user.id || deletingId === user.id}
-              on:click={() => deletePendingUser(user.id)}
+              on:click={() => requestDeletePendingUser(user.id)}
             >
               {deletingId === user.id ? "Deleting..." : "Delete"}
             </button>
@@ -124,3 +137,14 @@
     </section>
   {/if}
 </main>
+
+<ConfirmDialog
+  open={pendingDeleteUserId !== null}
+  title="Delete pending user?"
+  message="This permanently deletes this pending user and all their data."
+  confirmLabel="Delete user"
+  busyLabel="Deleting..."
+  busy={deletingId !== null}
+  on:confirm={confirmDeletePendingUser}
+  on:cancel={cancelDeletePendingUser}
+/>

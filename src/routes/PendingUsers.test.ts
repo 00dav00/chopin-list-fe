@@ -39,7 +39,6 @@ describe("PendingUsers route", () => {
     apiMock.listPendingUsers.mockReset();
     apiMock.approveUser.mockReset();
     apiMock.deletePendingUser.mockReset();
-    vi.spyOn(window, "confirm").mockReturnValue(true);
   });
 
   it("redirects non-admin users to dashboard", async () => {
@@ -193,6 +192,8 @@ describe("PendingUsers route", () => {
     render(PendingUsers);
 
     await user.click(await screen.findByRole("button", { name: "Delete" }));
+    // Confirm in the shared dialog that replaced window.confirm().
+    await user.click(await screen.findByRole("button", { name: "Delete user" }));
 
     await waitFor(() => {
       expect(apiMock.deletePendingUser).toHaveBeenCalledWith("pending-1");

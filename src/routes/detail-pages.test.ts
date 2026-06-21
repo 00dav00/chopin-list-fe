@@ -307,7 +307,6 @@ describe.each(detailConfigs)("$name route", (config) => {
   beforeEach(() => {
     resetApiMocks();
     pushMock.mockReset();
-    vi.spyOn(window, "confirm").mockReturnValue(true);
   });
 
   it("loads detail data and sorts items by sort order", async () => {
@@ -603,6 +602,8 @@ describe.each(detailConfigs)("$name route", (config) => {
     render(config.component, { props: config.props });
 
     await user.click((await screen.findAllByRole("button", { name: "Delete" }))[0]);
+    // Confirm in the shared dialog that replaced window.confirm().
+    await user.click(await screen.findByRole("button", { name: "Delete item" }));
 
     await waitFor(() => {
       config.assertDeleteCalled();
@@ -637,7 +638,6 @@ describe("ListDetail route specific behavior", () => {
   beforeEach(() => {
     resetApiMocks();
     pushMock.mockReset();
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     authStore.set({ token: null, expiry: null, user: null, ready: true });
   });
 
@@ -1033,7 +1033,6 @@ describe("TemplateDetail route specific behavior", () => {
   beforeEach(() => {
     resetApiMocks();
     pushMock.mockReset();
-    vi.spyOn(window, "confirm").mockReturnValue(true);
   });
 
   it("creates a list from template and navigates to the new list", async () => {

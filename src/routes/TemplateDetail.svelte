@@ -2,6 +2,7 @@
   import { onDestroy } from "svelte";
   import { push } from "svelte-spa-router";
   import { api } from "../lib/api";
+  import ConfirmDialog from "../lib/ConfirmDialog.svelte";
   import { getApiErrorMessage } from "../lib/errors";
   import { notify, clearNotices } from "../lib/notices";
   import NavMenu from "../lib/NavMenu.svelte";
@@ -34,6 +35,8 @@
   let editQty = "";
   let savingItem = false;
   let updatingQtyItemId: string | null = null;
+  let pendingDeleteItemId: string | null = null;
+  let deletingItemId: string | null = null;
 
   let createListName = "";
   let creatingList = false;
@@ -341,14 +344,28 @@
     editQty = stepQuantity(editQty, -1);
   };
 
-  const deleteTemplateItem = async (itemId: string) => {
-    if (!template) return;
-    if (!window.confirm("Delete this template item?")) return;
+  const deleteTemplateItem = (itemId: string) => {
+    if (!template || deletingItemId) return;
+    pendingDeleteItemId = itemId;
+  };
+
+  const cancelDeleteTemplateItem = () => {
+    if (deletingItemId) return;
+    pendingDeleteItemId = null;
+  };
+
+  const confirmDeleteTemplateItem = async () => {
+    const itemId = pendingDeleteItemId;
+    if (!template || !itemId || deletingItemId) return;
+    deletingItemId = itemId;
     try {
       await api.deleteTemplateItem(template.id, itemId);
       items = items.filter((item) => item.id !== itemId);
+      pendingDeleteItemId = null;
     } catch (err) {
       notifyMutationError(err, "Couldn't delete that item. Try again.");
+    } finally {
+      deletingItemId = null;
     }
   };
 
@@ -763,6 +780,17 @@
     </section>
   </div>
 {/if}
+
+<ConfirmDialog
+  open={pendingDeleteItemId !== null}
+  title="Delete template item?"
+  message="This permanently removes the item from this template."
+  confirmLabel="Delete item"
+  busyLabel="Deleting..."
+  busy={deletingItemId !== null}
+  on:confirm={confirmDeleteTemplateItem}
+  on:cancel={cancelDeleteTemplateItem}
+/>
 
 <style>
   /* In-gap "Insert here" affordance. Always rendered (no hover dependency, so

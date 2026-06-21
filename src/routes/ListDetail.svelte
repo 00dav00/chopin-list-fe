@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
   import { api, ApiError } from "../lib/api";
+  import ConfirmDialog from "../lib/ConfirmDialog.svelte";
   import { getApiErrorMessage } from "../lib/errors";
   import { notify, clearNotices } from "../lib/notices";
   import NavMenu from "../lib/NavMenu.svelte";
@@ -42,6 +43,8 @@
   let savingItem = false;
   let togglingItemId: string | null = null;
   let updatingQtyItemId: string | null = null;
+  let pendingDeleteItemId: string | null = null;
+  let deletingItemId: string | null = null;
   let reorderingItems = false;
   let draggedItemId: string | null = null;
   let dragOverItemId: string | null = null;
@@ -569,14 +572,28 @@
     }
   };
 
-  const deleteItem = async (itemId: string) => {
-    if (isListCompleted) return;
-    if (!window.confirm("Delete this item?")) return;
+  const deleteItem = (itemId: string) => {
+    if (isListCompleted || deletingItemId) return;
+    pendingDeleteItemId = itemId;
+  };
+
+  const cancelDeleteItem = () => {
+    if (deletingItemId) return;
+    pendingDeleteItemId = null;
+  };
+
+  const confirmDeleteItem = async () => {
+    const itemId = pendingDeleteItemId;
+    if (!itemId || isListCompleted || deletingItemId) return;
+    deletingItemId = itemId;
     try {
       await api.deleteItem(itemId);
       items = items.filter((item) => item.id !== itemId);
+      pendingDeleteItemId = null;
     } catch (err) {
       notifyMutationError(err, "Couldn't delete that item. Try again.");
+    } finally {
+      deletingItemId = null;
     }
   };
 
@@ -1061,6 +1078,17 @@
     </section>
   </div>
 {/if}
+
+<ConfirmDialog
+  open={pendingDeleteItemId !== null}
+  title="Delete item?"
+  message="This permanently removes the item from your list."
+  confirmLabel="Delete item"
+  busyLabel="Deleting..."
+  busy={deletingItemId !== null}
+  on:confirm={confirmDeleteItem}
+  on:cancel={cancelDeleteItem}
+/>
 
 <style>
   /* In-gap "Insert here" affordance. Always rendered (no hover dependency, so
