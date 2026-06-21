@@ -1098,6 +1098,11 @@
     width: 100%;
     min-height: 44px;
     padding: 0.4rem 0;
+    /* Overlap the surrounding .stack gap (1rem) so the 44px hit area does not
+       add a full row of height per item — keeps long lists from ~doubling in
+       scroll length while preserving the touch target. The 11px overlap stays
+       inside the stack whitespace, so it does not intercept taps on the card. */
+    margin: -0.7rem 0;
     border: 0;
     background: transparent;
     color: var(--muted);
