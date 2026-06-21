@@ -271,7 +271,7 @@
         // Neutral / position-agnostic on purpose: the same failure path fires
         // for every gap insert, so the copy must not name a position.
         error =
-          "Item added, but it couldn't be placed where you wanted. It's at the bottom of your list.";
+          "Item added, but it couldn't be placed where you wanted. It's at the bottom of your template.";
         newItemName = "";
         newItemQty = "1";
         insertAtIndex = null;

@@ -71,6 +71,9 @@ type DetailConfig = {
   reorderApi: "reorderListItems" | "reorderTemplateItems";
   makeEntityItem: (opts: Record<string, unknown>) => any;
   notFoundText: string;
+  // Copy shown when create succeeds but the reposition reorder fails. Names
+  // the entity ("list" vs "template"), so it differs per page.
+  partialFailureCopy: string;
   seedLoadSuccess: () => void;
   seedLoadError: (error: unknown) => void;
   seedRenameSuccess: (name: string) => void;
@@ -143,6 +146,8 @@ const detailConfigs: DetailConfig[] = [
     reorderApi: "reorderListItems",
     makeEntityItem: (opts) => makeItem({ list_id: listId, ...opts }),
     notFoundText: "List not found.",
+    partialFailureCopy:
+      "Item added, but it couldn't be placed where you wanted. It's at the bottom of your list.",
     seedLoadSuccess: () => {
       apiMock.getList.mockResolvedValue(listBase);
       apiMock.listItems.mockResolvedValue(listItemsUnsorted);
@@ -215,6 +220,8 @@ const detailConfigs: DetailConfig[] = [
     reorderApi: "reorderTemplateItems",
     makeEntityItem: (opts) => makeTemplateItem({ template_id: templateId, ...opts }),
     notFoundText: "Template not found.",
+    partialFailureCopy:
+      "Item added, but it couldn't be placed where you wanted. It's at the bottom of your template.",
     seedLoadSuccess: () => {
       apiMock.getTemplate.mockResolvedValue(
         makeTemplateDetail({
@@ -507,11 +514,7 @@ describe.each(detailConfigs)("$name route", (config) => {
     // landed), not the generic "create failed" and not an impossible drag
     // instruction. The list is replaced by the error until it clears / a
     // refetch reconciles — asserted here so the test documents it on purpose.
-    expect(
-      await screen.findByText(
-        "Item added, but it couldn't be placed where you wanted. It's at the bottom of your list."
-      )
-    ).toBeTruthy();
+    expect(await screen.findByText(config.partialFailureCopy)).toBeTruthy();
     expect(screen.queryByRole("heading", { level: 3, name: inserted })).toBeNull();
     expect(screen.queryByText("Create failed.")).toBeNull();
   });
@@ -837,6 +840,68 @@ describe("ListDetail route specific behavior", () => {
         "list-item-2",
         "list-item-1",
         "list-item-purchased",
+      ]);
+    });
+  });
+
+  it("gap-inserts in the unpurchased section, trailing purchased items with order intact", async () => {
+    const user = userEvent.setup();
+    const inserted = "Top of list";
+    apiMock.getList.mockResolvedValue(listBase);
+    // Stored order is genuinely interleaved (purchased Bread sits at sort_order
+    // 2, BETWEEN unpurchased Apples=1 and Bananas=3) — toggle never touches
+    // sort_order, so the full list is NOT partitioned by construction. This
+    // forces the regroup to actually move a purchased item to the tail rather
+    // than the payload coinciding with the stored order.
+    apiMock.listItems.mockResolvedValue([
+      makeItem({ id: "list-item-1", list_id: listId, name: "Apples", sort_order: 1 }),
+      makeItem({ id: "list-item-bread", list_id: listId, name: "Bread", purchased: true, sort_order: 2 }),
+      makeItem({ id: "list-item-2", list_id: listId, name: "Bananas", sort_order: 3 }),
+      makeItem({ id: "list-item-milk", list_id: listId, name: "Milk", purchased: true, sort_order: 4 }),
+    ]);
+    apiMock.createItem.mockResolvedValue(
+      makeItem({ id: "list-item-created", list_id: listId, name: inserted, sort_order: 99 })
+    );
+    apiMock.reorderListItems.mockResolvedValue([
+      makeItem({ id: "list-item-created", list_id: listId, name: inserted, sort_order: 0 }),
+      makeItem({ id: "list-item-1", list_id: listId, name: "Apples", sort_order: 1 }),
+      makeItem({ id: "list-item-2", list_id: listId, name: "Bananas", sort_order: 2 }),
+      makeItem({ id: "list-item-bread", list_id: listId, name: "Bread", purchased: true, sort_order: 3 }),
+      makeItem({ id: "list-item-milk", list_id: listId, name: "Milk", purchased: true, sort_order: 4 }),
+    ]);
+
+    render(ListDetail, { props: { params: { listId } } });
+
+    await user.click(
+      await screen.findByRole("button", { name: "Insert here, before Apples" })
+    );
+    await user.type(await screen.findByPlaceholderText("Item name"), inserted);
+    await user.click(screen.getByRole("button", { name: "Insert item" }));
+
+    await waitFor(() => {
+      // Payload = reordered unpurchased (new item spliced at index 0) ++
+      // purchased, with purchased in their original relative order at the tail.
+      expect(apiMock.reorderListItems).toHaveBeenCalledWith(listId, [
+        "list-item-created",
+        "list-item-1",
+        "list-item-2",
+        "list-item-bread",
+        "list-item-milk",
+      ]);
+    });
+    // Display order (checkboxes are rendered unpurchased-section-then-purchased-
+    // section): the insert lands at the top of unpurchased and the purchased
+    // section's order is unchanged — Bread still before Milk, both still last.
+    await waitFor(() => {
+      const labels = screen
+        .getAllByRole("checkbox")
+        .map((checkbox) => checkbox.getAttribute("aria-label"));
+      expect(labels).toEqual([
+        `Purchased ${inserted}`,
+        "Purchased Apples",
+        "Purchased Bananas",
+        "Purchased Bread",
+        "Purchased Milk",
       ]);
     });
   });

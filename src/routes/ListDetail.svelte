@@ -783,7 +783,7 @@
               class="insert-gap"
               aria-label={gapAriaLabel(i)}
               title="Insert here"
-              disabled={isListCompleted || editingItemId !== null || reorderingItems}
+              disabled={isListCompleted || !!editingItemId || savingItem || reorderingItems}
               on:click={() => openInsertGap(i)}
             >
               <span class="insert-gap-line" aria-hidden="true"></span>
