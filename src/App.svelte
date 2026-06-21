@@ -19,6 +19,7 @@ import ListDetail from "./routes/ListDetail.svelte";
   import PendingUsers from "./routes/PendingUsers.svelte";
   import ActiveUsers from "./routes/ActiveUsers.svelte";
   import NotFound from "./routes/NotFound.svelte";
+  import Notices from "./lib/Notices.svelte";
 
   const routes = {
     "/": Dashboard,
@@ -68,3 +69,7 @@ import ListDetail from "./routes/ListDetail.svelte";
 {:else}
   <Router {routes} />
 {/if}
+
+<!-- App-wide non-blocking notice stack; mounted once so it survives route
+     changes. -->
+<Notices />

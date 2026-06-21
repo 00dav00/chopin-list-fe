@@ -1,7 +1,9 @@
 <script lang="ts">
+  import { onDestroy } from "svelte";
   import { push } from "svelte-spa-router";
   import { api } from "../lib/api";
   import { getApiErrorMessage } from "../lib/errors";
+  import { notify, clearNotices } from "../lib/notices";
   import NavMenu from "../lib/NavMenu.svelte";
   import type { TemplateDetailOut, TemplateItemOut } from "../lib/types";
   import { authStore } from "../stores/auth";
@@ -57,6 +59,15 @@
     return Number.isInteger(next) ? next.toString() : `${next}`;
   };
 
+  // Surface a non-blocking error notice for a failed mutation, with fixed,
+  // human copy. Preserves 401 suppression: a 401 drives the global re-auth
+  // redirect, so getApiErrorMessage returns null for it and we stay silent.
+  const notifyMutationError = (err: unknown, message: string) => {
+    if (getApiErrorMessage(err, message)) {
+      notify({ message, severity: "error" });
+    }
+  };
+
   const sortItems = (nextItems: TemplateItemOut[]) =>
     [...nextItems].sort((a, b) => {
       if (a.sort_order !== b.sort_order) {
@@ -98,7 +109,6 @@
     if (!template) return;
     items = reordered;
     reorderingItems = true;
-    error = null;
     try {
       const updated = await api.reorderTemplateItems(
         template.id,
@@ -107,10 +117,7 @@
       items = sortItems(updated);
     } catch (err) {
       items = previousItems;
-      const message = getApiErrorMessage(err, "Reorder failed.");
-      if (message) {
-        error = message;
-      }
+      notifyMutationError(err, "Couldn't save the new order — your template is back to how it was.");
     } finally {
       reorderingItems = false;
     }
@@ -206,17 +213,13 @@
     const name = templateName.trim();
     if (!name) return;
     savingName = true;
-    error = null;
     try {
       const updated = await api.updateTemplate(template.id, { name });
       template = { ...template, ...updated };
       templateName = updated.name;
       renameModalOpen = false;
     } catch (err) {
-      const message = getApiErrorMessage(err, "Update failed.");
-      if (message) {
-        error = message;
-      }
+      notifyMutationError(err, "Couldn't rename the template.");
     } finally {
       savingName = false;
     }
@@ -227,7 +230,6 @@
     const name = newItemName.trim();
     if (!name) return;
     creatingItem = true;
-    error = null;
     const atIndex = insertAtIndex;
     const previousItems = items;
     let created: TemplateItemOut | null = null;
@@ -260,27 +262,22 @@
       if (created) {
         // Create succeeded but the reposition (reorder) failed — a partial
         // success: the item exists at the bottom of the template on the
-        // server. Surface it via the app-wide full-screen `error` pattern
-        // (matching every other mutation failure for v1; a non-blocking inline
-        // notice is deferred to a separate cross-cutting ticket). The copy is
-        // purely informational — it names where the item landed and does not
-        // instruct a drag the user can't perform while the list is hidden.
-        // Local state still appends the item so the list is correct once the
-        // error clears.
+        // server. Surfaced as a persistent WARNING notice (non-blocking)
+        // since the template is still fully visible: the copy regains the
+        // guidance the user needs ("drag it to reorder"). Local state appends
+        // the item so the template reflects reality.
         items = sortItems([...previousItems, created]);
-        // Neutral / position-agnostic on purpose: the same failure path fires
-        // for every gap insert, so the copy must not name a position.
-        error =
-          "Item added, but it couldn't be placed where you wanted. It's at the bottom of your template.";
+        notify({
+          message:
+            "Item added, but we couldn't place it where you wanted — it's at the bottom. Drag it to reorder.",
+          severity: "warning",
+        });
         newItemName = "";
         newItemQty = "1";
         insertAtIndex = null;
         addItemModalOpen = false;
       } else {
-        const message = getApiErrorMessage(err, "Create failed.");
-        if (message) {
-          error = message;
-        }
+        notifyMutationError(err, "Couldn't add the item. Try again.");
       }
     } finally {
       creatingItem = false;
@@ -347,15 +344,11 @@
   const deleteTemplateItem = async (itemId: string) => {
     if (!template) return;
     if (!window.confirm("Delete this template item?")) return;
-    error = null;
     try {
       await api.deleteTemplateItem(template.id, itemId);
       items = items.filter((item) => item.id !== itemId);
     } catch (err) {
-      const message = getApiErrorMessage(err, "Delete failed.");
-      if (message) {
-        error = message;
-      }
+      notifyMutationError(err, "Couldn't delete that item. Try again.");
     }
   };
 
@@ -367,7 +360,6 @@
     if (nextQty === currentQty) return;
 
     updatingQtyItemId = item.id;
-    error = null;
     try {
       const updated = await api.updateTemplateItem(template.id, item.id, {
         name: item.name,
@@ -377,10 +369,7 @@
         items.map((entry) => (entry.id === item.id ? updated : entry))
       );
     } catch (err) {
-      const message = getApiErrorMessage(err, "Update failed.");
-      if (message) {
-        error = message;
-      }
+      notifyMutationError(err, "Couldn't change the quantity. Try again.");
     } finally {
       updatingQtyItemId = null;
     }
@@ -401,7 +390,6 @@
     const name = editName.trim();
     if (!name) return;
     savingItem = true;
-    error = null;
     try {
       const payload = {
         name,
@@ -413,10 +401,7 @@
       );
       editingItemId = null;
     } catch (err) {
-      const message = getApiErrorMessage(err, "Update failed.");
-      if (message) {
-        error = message;
-      }
+      notifyMutationError(err, "Couldn't save your changes. Try again.");
     } finally {
       savingItem = false;
     }
@@ -425,17 +410,13 @@
   const createListFromTemplate = async () => {
     if (!template || creatingList) return;
     creatingList = true;
-    error = null;
     try {
       const payload = { name: createListName.trim() || null };
       const created = await api.createListFromTemplate(template.id, payload);
       createListModalOpen = false;
       push(`/lists/${created.id}`);
     } catch (err) {
-      const message = getApiErrorMessage(err, "Create failed.");
-      if (message) {
-        error = message;
-      }
+      notifyMutationError(err, "Couldn't create a list from this template. Try again.");
     } finally {
       creatingList = false;
     }
@@ -452,9 +433,16 @@
   };
 
   $: if (params.templateId && params.templateId !== currentTemplateId) {
+    if (currentTemplateId) {
+      // Switching templates mid-session: drop the previous template's notices.
+      clearNotices();
+    }
     currentTemplateId = params.templateId;
     loadTemplate(currentTemplateId);
   }
+
+  // Leaving the page entirely — drop any lingering mutation notices.
+  onDestroy(clearNotices);
 </script>
 
 <main>

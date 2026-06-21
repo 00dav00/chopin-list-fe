@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { get } from "svelte/store";
+import { notices, clearNotices } from "../lib/notices";
 import ListDetail from "./ListDetail.svelte";
 import TemplateDetail from "./TemplateDetail.svelte";
 import {
@@ -71,8 +73,9 @@ type DetailConfig = {
   reorderApi: "reorderListItems" | "reorderTemplateItems";
   makeEntityItem: (opts: Record<string, unknown>) => any;
   notFoundText: string;
-  // Copy shown when create succeeds but the reposition reorder fails. Names
-  // the entity ("list" vs "template"), so it differs per page.
+  // Warning-notice copy shown when create succeeds but the reposition reorder
+  // fails. Noun-free, so identical across pages — kept per-config in case the
+  // copy diverges later.
   partialFailureCopy: string;
   seedLoadSuccess: () => void;
   seedLoadError: (error: unknown) => void;
@@ -147,7 +150,7 @@ const detailConfigs: DetailConfig[] = [
     makeEntityItem: (opts) => makeItem({ list_id: listId, ...opts }),
     notFoundText: "List not found.",
     partialFailureCopy:
-      "Item added, but it couldn't be placed where you wanted. It's at the bottom of your list.",
+      "Item added, but we couldn't place it where you wanted — it's at the bottom. Drag it to reorder.",
     seedLoadSuccess: () => {
       apiMock.getList.mockResolvedValue(listBase);
       apiMock.listItems.mockResolvedValue(listItemsUnsorted);
@@ -221,7 +224,7 @@ const detailConfigs: DetailConfig[] = [
     makeEntityItem: (opts) => makeTemplateItem({ template_id: templateId, ...opts }),
     notFoundText: "Template not found.",
     partialFailureCopy:
-      "Item added, but it couldn't be placed where you wanted. It's at the bottom of your template.",
+      "Item added, but we couldn't place it where you wanted — it's at the bottom. Drag it to reorder.",
     seedLoadSuccess: () => {
       apiMock.getTemplate.mockResolvedValue(
         makeTemplateDetail({
@@ -295,6 +298,9 @@ const detailConfigs: DetailConfig[] = [
 
 const resetApiMocks = () => {
   Object.values(apiMock).forEach((fn) => fn.mockReset());
+  // The notices store is module-global; clear it so notices don't leak
+  // between tests.
+  clearNotices();
 };
 
 describe.each(detailConfigs)("$name route", (config) => {
@@ -485,7 +491,7 @@ describe.each(detailConfigs)("$name route", (config) => {
     });
   });
 
-  it("reports a partial-success error when repositioning fails after create", async () => {
+  it("raises a persistent warning notice when repositioning fails after create", async () => {
     const user = userEvent.setup();
     const inserted = "Stranded";
     config.seedLoadSuccess();
@@ -509,14 +515,64 @@ describe.each(detailConfigs)("$name route", (config) => {
     await waitFor(() => {
       expect(apiMock[config.reorderApi]).toHaveBeenCalled();
     });
-    // v1 surface (intentional): a partial success uses the app-wide
-    // full-screen `error` pattern. Copy is informational (names where the item
-    // landed), not the generic "create failed" and not an impossible drag
-    // instruction. The list is replaced by the error until it clears / a
-    // refetch reconciles — asserted here so the test documents it on purpose.
-    expect(await screen.findByText(config.partialFailureCopy)).toBeTruthy();
-    expect(screen.queryByRole("heading", { level: 3, name: inserted })).toBeNull();
+    // Partial success is now a NON-BLOCKING, persistent WARNING notice (not the
+    // full-screen error). Copy regains the "drag to reorder" guidance since the
+    // page stays visible. Asserted against the store (Notices mounts at App
+    // root, not inside the per-route render).
+    await waitFor(() => {
+      const current = get(notices);
+      expect(current).toHaveLength(1);
+      expect(current[0].severity).toBe("warning");
+      expect(current[0].autoDismissMs).toBeNull();
+      expect(current[0].message).toBe(config.partialFailureCopy);
+    });
+    // The page is NOT replaced by a full-screen error — the created item is
+    // visible at the bottom and the items heading still renders.
+    expect(await screen.findByRole("heading", { level: 3, name: inserted })).toBeTruthy();
     expect(screen.queryByText("Create failed.")).toBeNull();
+  });
+
+  it("surfaces an error notice when a mutation fails (non-401)", async () => {
+    const user = userEvent.setup();
+    const newItemName = "Doomed";
+    config.seedLoadSuccess();
+    apiMock[config.createApi].mockRejectedValue(
+      new TestApiError(500, "API request failed", "Create failed.")
+    );
+
+    render(config.component, { props: config.props });
+
+    await user.click(await screen.findByRole("button", { name: "Add item" }));
+    await user.type(await screen.findByPlaceholderText("Item name"), newItemName);
+    await user.click(screen.getByRole("button", { name: "Create item" }));
+
+    await waitFor(() => {
+      const current = get(notices);
+      expect(current).toHaveLength(1);
+      expect(current[0].severity).toBe("error");
+      expect(current[0].autoDismissMs).toBe(5000);
+      expect(current[0].message).toBe("Couldn't add the item. Try again.");
+    });
+  });
+
+  it("suppresses the notice on a 401 (global re-auth handles it)", async () => {
+    const user = userEvent.setup();
+    const newItemName = "Doomed";
+    config.seedLoadSuccess();
+    apiMock[config.createApi].mockRejectedValue(
+      new TestApiError(401, "API request failed", "Unauthorized")
+    );
+
+    render(config.component, { props: config.props });
+
+    await user.click(await screen.findByRole("button", { name: "Add item" }));
+    await user.type(await screen.findByPlaceholderText("Item name"), newItemName);
+    await user.click(screen.getByRole("button", { name: "Create item" }));
+
+    await waitFor(() => {
+      expect(apiMock[config.createApi]).toHaveBeenCalled();
+    });
+    expect(get(notices)).toHaveLength(0);
   });
 
   it("edits an existing item", async () => {
@@ -1007,6 +1063,33 @@ describe("TemplateDetail route specific behavior", () => {
       });
     });
     expect(pushMock).toHaveBeenCalledWith("/lists/list-from-template");
+  });
+
+  it("surfaces an error notice when create-list-from-template fails", async () => {
+    const user = userEvent.setup();
+    apiMock.getTemplate.mockResolvedValue(
+      makeTemplateDetail({
+        ...templateBase,
+        items: templateItemsUnsorted,
+      })
+    );
+    apiMock.createListFromTemplate.mockRejectedValue(
+      new TestApiError(500, "API request failed", "Create failed.")
+    );
+
+    render(TemplateDetail, { props: { params: { templateId } } });
+
+    await user.click(await screen.findByRole("button", { name: "Create list from template" }));
+    await user.click(screen.getByRole("button", { name: "Create list" }));
+
+    await waitFor(() => {
+      const current = get(notices);
+      expect(current).toHaveLength(1);
+      expect(current[0].severity).toBe("error");
+      expect(current[0].message).toBe(
+        "Couldn't create a list from this template. Try again."
+      );
+    });
   });
 
   it("shows template item count beside heading", async () => {
