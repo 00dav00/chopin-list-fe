@@ -50,7 +50,13 @@ describe("Login route", () => {
     );
   });
 
-  it("saves token and routes to /dashboard on Google success", async () => {
+  // Post-auth navigation moved out of this component. App.svelte's redirect
+  // guard is now the only navigator: it fires the moment saveToken flips
+  // isAuthed, which is while the getMe() below is still in flight, so a push
+  // here landed *afterwards* and silently overwrote it. Invisible while both
+  // targets were /dashboard; it broke emailed deep-links the moment the
+  // destination became conditional. These assert the handoff, not the push.
+  it("saves token and loads the profile on Google success, leaving routing to the app guard", async () => {
     initGoogleSignInMock.mockImplementation(
       (_elementId: string, onSuccess: (token: string) => void) => {
         onSuccess("jwt-token");
@@ -69,7 +75,7 @@ describe("Login route", () => {
     await waitFor(() => {
       expect(apiModule.api.getMe).toHaveBeenCalled();
     });
-    expect(pushMock).toHaveBeenCalledWith("/dashboard");
+    expect(pushMock).not.toHaveBeenCalledWith("/dashboard");
   });
 
   it("clears token and shows error when /me fails after sign-in", async () => {
@@ -183,7 +189,8 @@ describe("Login route", () => {
     await waitFor(() => {
       expect(sessionStorage.getItem("auth_pending_approval")).toBeNull();
     });
-    expect(pushMock).toHaveBeenCalledWith("/dashboard");
+    // See the note above: routing is the app guard's job, not this component's.
+    expect(pushMock).not.toHaveBeenCalledWith("/dashboard");
   });
 
   it("shows pending-approval box and persists the flag when /me returns 403", async () => {

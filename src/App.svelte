@@ -5,9 +5,11 @@
   import {
     authStore,
     bootstrapAuth,
+    captureReturnTo,
     isTokenExpired,
     clearToken,
     setAuthNotice,
+    takeReturnTo,
   } from "./stores/auth";
   import Login from "./routes/Login.svelte";
   import Dashboard from "./routes/Dashboard.svelte";
@@ -44,6 +46,13 @@ import ListDetail from "./routes/ListDetail.svelte";
       }
     });
 
+    // Where did this page load actually want to go? An admin arriving from a
+    // notification email lands here before any redirect has happened, so the
+    // origin route is still in $location. Read it once, at boot, and only here:
+    // capturing inside the redirect guard below would also fire on a
+    // mid-session 401, which is session expiry rather than a deep-link.
+    captureReturnTo($location);
+
     bootstrapAuth();
 
     return () => {
@@ -55,11 +64,28 @@ import ListDetail from "./routes/ListDetail.svelte";
     Boolean($authStore.token) && !isTokenExpired($authStore.expiry);
 
   $: if ($authStore.ready) {
-    if (!isAuthed && $location !== "/login") {
-      push("/login");
-    }
-    if (isAuthed && $location === "/login") {
-      push("/dashboard");
+    if (!isAuthed) {
+      if ($location !== "/login") {
+        push("/login");
+      }
+    } else if ($location === "/login" && $authStore.user) {
+      // This arm is the *only* post-auth navigator; Login.svelte deliberately
+      // no longer pushes.
+      //
+      // The `$authStore.user` condition is load-bearing, not defensive.
+      // `isAuthed` is token-only, and saveToken flips it synchronously while
+      // the sign-in callback is still awaiting api.getMe() -- so without this
+      // we would navigate before the profile exists. Every allowlisted return
+      // target is admin-gated (PendingUsers.svelte:21 bounces to /dashboard
+      // when $authStore.user?.admin is falsy), so the deep-link would arrive,
+      // fail that route's own guard against a null user, and bounce straight
+      // back out. Waiting for the profile is what makes the return survive.
+      //
+      // It also makes this arm fire exactly once per sign-in, which is why
+      // takeReturnTo()'s destructive read needs no memoization: the flush that
+      // used to re-enter here (saveToken, profile not yet loaded) no longer
+      // passes the condition above.
+      push(takeReturnTo() ?? "/dashboard");
     }
   }
 </script>

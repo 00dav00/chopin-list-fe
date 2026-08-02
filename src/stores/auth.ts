@@ -6,7 +6,24 @@ const TOKEN_KEY = "auth_token";
 const EXPIRY_KEY = "auth_expiry";
 const NOTICE_KEY = "auth_notice";
 const PENDING_KEY = "auth_pending_approval";
+const RETURN_TO_KEY = "auth_return_to";
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+// Routes an emailed deep-link may return an admin to after sign-in.
+//
+// Seeded from the route table in App.svelte -- deliberately NOT from the ticket
+// text, which cited `/me/admin/pending-users`. That is the backend API path;
+// the FE route carries no `/me` prefix, so seeding from the ticket would mean
+// the hash never matches and the return silently no-ops, with nothing failing
+// loudly enough to catch it.
+//
+// A one-entry allowlist rather than a generic internal-path validator: a
+// validator accepts *any* internal path, which is general redirect-preservation
+// with a guard bolted on, and it carries its own open-redirect reasoning. A
+// literal allowlist provably cannot become one, and makes the behaviour change
+// on every other route exactly nil. Widening this means adding an entry, not
+// rediscovering the mechanism.
+const RETURN_TO_ALLOWLIST = ["/admin/pending-users"];
 
 export type AuthState = {
   token: string | null;
@@ -102,6 +119,48 @@ export const isTokenExpired = (expiry: number | null) => {
     return true;
   }
   return Date.now() > expiry;
+};
+
+/** Remember where an emailed deep-link was headed, before we bounce to login. */
+export const captureReturnTo = (path: string) => {
+  if (typeof sessionStorage === "undefined") {
+    return;
+  }
+  // Only capture while signed out. An admin who opens the deep-link with a live
+  // session is never redirected to login, so a stash made here would sit
+  // unclaimed and then fire much later, after an unrelated session expiry.
+  const stored = readStoredAuth();
+  if (stored.token && !isTokenExpired(stored.expiry)) {
+    return;
+  }
+  if (!RETURN_TO_ALLOWLIST.includes(path)) {
+    return;
+  }
+  sessionStorage.setItem(RETURN_TO_KEY, path);
+};
+
+/** Discard a stored return path that will never be consumed.
+ *
+ * The pop lives only in App.svelte's `isAuthed && $location === "/login"` arm,
+ * and a sign-in that ends in 403 never reaches it -- so on the pending-approval
+ * path the stash has no consumer at all and simply survives. Approval is a
+ * multi-day wait; without this the stale intent fires at some arbitrary later
+ * sign-in in the same tab.
+ */
+export const clearReturnTo = () => {
+  if (typeof sessionStorage !== "undefined") {
+    sessionStorage.removeItem(RETURN_TO_KEY);
+  }
+};
+
+/** Consume the stored return path. Read-and-remove: it is used at most once. */
+export const takeReturnTo = (): string | null => {
+  if (typeof sessionStorage === "undefined") {
+    return null;
+  }
+  const path = sessionStorage.getItem(RETURN_TO_KEY);
+  sessionStorage.removeItem(RETURN_TO_KEY);
+  return path && RETURN_TO_ALLOWLIST.includes(path) ? path : null;
 };
 
 export const saveToken = (token: string) => {

@@ -8,6 +8,7 @@
     authNoticeStore,
     clearToken,
     clearPendingApproval,
+    clearReturnTo,
     hydrateAuthNotice,
     isPendingApproval,
     saveToken,
@@ -34,12 +35,30 @@
         try {
           const user = await api.getMe();
           setCurrentUser(user);
-          push("/dashboard");
+          // No push here. App.svelte's redirect guard owns the post-auth
+          // destination and has already navigated by this point -- saveToken
+          // above flips isAuthed synchronously, so the guard runs while this
+          // await is still in flight. A push here lands *after* that
+          // navigation and silently overwrites it, which sends an admin
+          // arriving from a notification deep-link to the dashboard instead.
+          // Only visible with a realistic network delay; with an instantly
+          // resolved fetch the two land in the opposite order and it passes.
         } catch (err) {
           clearToken();
           if (err instanceof ApiError && err.status === 403) {
             pendingApproval = true;
             setPendingApproval();
+            // Load-bearing, and covered: "discards the emailed return path
+            // when sign-in ends in pending approval" in src/App.test.ts fails
+            // if you remove this line. Do not delete it as defensive.
+            //
+            // App.svelte's redirect arm is the only thing that consumes a
+            // stashed return path, and it requires a populated $authStore.user.
+            // A 403 never produces one, so this branch is the sole exit where
+            // the stash would otherwise survive -- and approval is a multi-day
+            // wait, so it would resurface at an unrelated later sign-in in this
+            // tab. Only returnTo touchpoint outside App.svelte.
+            clearReturnTo();
           } else {
             clearPendingApproval();
             error = getApiErrorMessage(err, "Sign in failed.");
