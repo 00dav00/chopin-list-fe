@@ -39,7 +39,9 @@ Use the Node version in `.nvmrc` (`v20.20.0`) before running commands.
 ## Commit & Pull Request Guidelines
 - Follow existing history style: short imperative commits (example: `Add test coverage for the frontend`).
 - Keep commits focused to one logical change.
-- PRs should include: summary, why the change is needed, linked issue/ticket, and test evidence.
+- Keep PR descriptions and review comments to 4 lines or fewer. Say what changed, why, and how it
+  was verified in plain prose; leave the detailed reasoning out of the description.
+- Within that limit, cover: summary, why the change is needed, linked issue/ticket, and test evidence.
 - Include screenshots/GIFs for UI changes in `src/routes/*`.
 - Call out config/env updates (for example `.env.example`, auth, API base URL).
 
