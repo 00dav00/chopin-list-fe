@@ -146,18 +146,14 @@ describe("App", () => {
     expect(sessionStorage.getItem("auth_pending_approval")).toBe("true");
   });
 
-  // -------------------------------------------------------------------------
   // Deep-links from the new-user notification email must survive the login
   // round-trip. Store-level unit tests live in src/stores/auth.test.ts; these
-  // drive the real redirect guard, because the guard is where the pop happens
-  // and a sign-in-callback-level test would pass even if the pop were dead code.
-  // -------------------------------------------------------------------------
+  // drive the real redirect guard, which is where the pop happens.
 
   // Responses resolve after a few real milliseconds rather than instantly.
-  // This is load-bearing, not incidental: with an immediately-resolved fetch
-  // the competing post-auth navigations land in a favourable order and these
-  // tests pass against a deep-link return that is actually broken in a browser.
-  // A realistic hop reproduces the order a real network produces.
+  // Load-bearing: with an immediately-resolved fetch the competing post-auth
+  // navigations land in a favourable order, and these tests pass against a
+  // deep-link return that is actually broken in a browser.
   const NETWORK_MS = 15;
 
   /** Let every pending navigation land, so a transient route can't pass as final. */
@@ -220,9 +216,8 @@ describe("App", () => {
 
     // And it must *stay* there. waitForRoute is satisfied by a momentary match,
     // so on its own it passes even when the admin route immediately bounces
-    // back out -- which is exactly what happens if we navigate before the
-    // profile has loaded, since PendingUsers redirects a non-admin to
-    // /dashboard and a null user reads as non-admin.
+    // back out -- which is what happens if we navigate before the profile
+    // loads, since PendingUsers reads a null user as non-admin.
     await settle();
     expect(getRoute()).toBe("/admin/pending-users");
     expect(sessionStorage.getItem("auth_return_to")).toBeNull();
@@ -284,11 +279,10 @@ describe("App", () => {
     // it did before this feature: no return path, default destination.
     await waitForRoute("/dashboard");
 
-    // This is the only *positive* coverage that an ordinary, non-deep-link
-    // sign-in reaches the dashboard -- the majority path. Login.test.ts now
-    // asserts `push` was NOT called with "/dashboard", which passes vacuously
-    // if anything upstream breaks, so the outcome has to be pinned here.
-    // Settled, not merely observed: waitForRoute resolves on a momentary match.
+    // The only *positive* coverage that an ordinary sign-in reaches the
+    // dashboard. Login.test.ts asserts `push` was NOT called with "/dashboard",
+    // which passes vacuously if anything upstream breaks. Settled, not merely
+    // observed: waitForRoute resolves on a momentary match.
     await settle();
     expect(getRoute()).toBe("/dashboard");
     expect(sessionStorage.getItem("auth_return_to")).toBeNull();

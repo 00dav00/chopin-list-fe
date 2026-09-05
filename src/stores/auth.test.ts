@@ -199,10 +199,8 @@ describe("auth store", () => {
     expect(authModule.isPendingApproval()).toBe(false);
   });
 
-  // -------------------------------------------------------------------------
   // returnTo for emailed deep-links. The redirect-guard integration is covered
   // in src/App.test.ts.
-  // -------------------------------------------------------------------------
 
   it("captureReturnTo stores an allowlisted route when signed out", () => {
     authModule.captureReturnTo("/admin/pending-users");

@@ -9,20 +9,10 @@ const PENDING_KEY = "auth_pending_approval";
 const RETURN_TO_KEY = "auth_return_to";
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
-// Routes an emailed deep-link may return an admin to after sign-in.
-//
-// Seeded from the route table in App.svelte -- deliberately NOT from the ticket
-// text, which cited `/me/admin/pending-users`. That is the backend API path;
-// the FE route carries no `/me` prefix, so seeding from the ticket would mean
-// the hash never matches and the return silently no-ops, with nothing failing
-// loudly enough to catch it.
-//
-// A one-entry allowlist rather than a generic internal-path validator: a
-// validator accepts *any* internal path, which is general redirect-preservation
-// with a guard bolted on, and it carries its own open-redirect reasoning. A
-// literal allowlist provably cannot become one, and makes the behaviour change
-// on every other route exactly nil. Widening this means adding an entry, not
-// rediscovering the mechanism.
+// Routes an emailed deep-link may return an admin to after sign-in. Seeded from
+// App.svelte's route table, not from the ticket text (which cited the backend
+// path `/me/admin/pending-users`). A literal one-entry list, not a generic
+// internal-path check, so this can never grow into open redirect-preservation.
 const RETURN_TO_ALLOWLIST = ["/admin/pending-users"];
 
 export type AuthState = {
@@ -139,13 +129,9 @@ export const captureReturnTo = (path: string) => {
   sessionStorage.setItem(RETURN_TO_KEY, path);
 };
 
-/** Discard a stored return path that will never be consumed.
- *
- * The pop lives only in App.svelte's `isAuthed && $location === "/login"` arm,
- * and a sign-in that ends in 403 never reaches it -- so on the pending-approval
- * path the stash has no consumer at all and simply survives. Approval is a
- * multi-day wait; without this the stale intent fires at some arbitrary later
- * sign-in in the same tab.
+/** Discard a stored return path that will never be consumed: only App.svelte's
+ * post-auth arm pops it, and a 403 sign-in never reaches there, so the stash
+ * would otherwise outlive a multi-day wait for approval.
  */
 export const clearReturnTo = () => {
   if (typeof sessionStorage !== "undefined") {

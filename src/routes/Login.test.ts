@@ -50,12 +50,10 @@ describe("Login route", () => {
     );
   });
 
-  // Post-auth navigation moved out of this component. App.svelte's redirect
-  // guard is now the only navigator: it fires the moment saveToken flips
-  // isAuthed, which is while the getMe() below is still in flight, so a push
-  // here landed *afterwards* and silently overwrote it. Invisible while both
-  // targets were /dashboard; it broke emailed deep-links the moment the
-  // destination became conditional. These assert the handoff, not the push.
+  // Post-auth navigation moved out of this component. App.svelte's guard fires
+  // the moment saveToken flips isAuthed, while the getMe() below is still in
+  // flight, so a push here landed afterwards and overwrote it. Harmless while
+  // both targets were /dashboard; it broke emailed deep-links.
   it("saves token and loads the profile on Google success, leaving routing to the app guard", async () => {
     initGoogleSignInMock.mockImplementation(
       (_elementId: string, onSuccess: (token: string) => void) => {
