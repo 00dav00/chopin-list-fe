@@ -28,6 +28,8 @@ Use the Node version in `.nvmrc` (`v20.20.0`) before running commands.
 - Use PascalCase for route/components (`TemplateDetail.svelte`).
 - Use camelCase/lowercase for TS modules (`auth.ts`, `api.ts`).
 - Keep API payload/result typing in `src/lib/types.ts` with clear suffixes like `Out`, `Create`, `Update`.
+- Keep code comments to 4 lines or fewer. Explain why the code is the way it is, not what it
+  does; if the reason needs more room than that, it belongs in the PR or a linked ticket.
 
 ## Testing Guidelines
 - Framework: Vitest + Testing Library (`@testing-library/svelte`) in `jsdom`.

@@ -198,4 +198,71 @@ describe("auth store", () => {
 
     expect(authModule.isPendingApproval()).toBe(false);
   });
+
+  // returnTo for emailed deep-links. The redirect-guard integration is covered
+  // in src/App.test.ts.
+
+  it("captureReturnTo stores an allowlisted route when signed out", () => {
+    authModule.captureReturnTo("/admin/pending-users");
+
+    expect(sessionStorage.getItem("auth_return_to")).toBe(
+      "/admin/pending-users"
+    );
+  });
+
+  it("captureReturnTo ignores routes outside the allowlist", () => {
+    authModule.captureReturnTo("/lists");
+
+    expect(sessionStorage.getItem("auth_return_to")).toBeNull();
+  });
+
+  it("captureReturnTo stores nothing when a live session already exists", () => {
+    // An admin who opens the deep-link already signed in is never redirected to
+    // login, so a stash here would sit unclaimed and then fire much later after
+    // an unrelated session expiry.
+    vi.spyOn(Date, "now").mockReturnValue(1_000);
+    localStorage.setItem("auth_token", "token-abc");
+    localStorage.setItem("auth_expiry", String(60_000));
+
+    authModule.captureReturnTo("/admin/pending-users");
+
+    expect(sessionStorage.getItem("auth_return_to")).toBeNull();
+  });
+
+  it("captureReturnTo still stores when the existing session is expired", () => {
+    vi.spyOn(Date, "now").mockReturnValue(60_000);
+    localStorage.setItem("auth_token", "token-abc");
+    localStorage.setItem("auth_expiry", String(1_000));
+
+    authModule.captureReturnTo("/admin/pending-users");
+
+    expect(sessionStorage.getItem("auth_return_to")).toBe(
+      "/admin/pending-users"
+    );
+  });
+
+  it("takeReturnTo consumes the stored route so it is used at most once", () => {
+    authModule.captureReturnTo("/admin/pending-users");
+
+    expect(authModule.takeReturnTo()).toBe("/admin/pending-users");
+    expect(authModule.takeReturnTo()).toBeNull();
+    expect(sessionStorage.getItem("auth_return_to")).toBeNull();
+  });
+
+  it("clearReturnTo discards a stash that will never be consumed", () => {
+    authModule.captureReturnTo("/admin/pending-users");
+
+    authModule.clearReturnTo();
+
+    expect(sessionStorage.getItem("auth_return_to")).toBeNull();
+  });
+
+  it("takeReturnTo rejects and clears a value outside the allowlist", () => {
+    // Defence in depth: sessionStorage is writable by any script on the origin,
+    // so the allowlist is re-checked on read rather than trusted from write.
+    sessionStorage.setItem("auth_return_to", "https://evil.example.com");
+
+    expect(authModule.takeReturnTo()).toBeNull();
+    expect(sessionStorage.getItem("auth_return_to")).toBeNull();
+  });
 });

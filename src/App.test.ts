@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/svelte";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { setRoute, waitForRoute } from "./test/utils/router";
+import { getRoute, setRoute, waitForRoute } from "./test/utils/router";
 
 const { initGoogleSignInMock } = vi.hoisted(() => ({
   initGoogleSignInMock: vi.fn(),
@@ -144,5 +144,147 @@ describe("App", () => {
       await screen.findByText(/Your account has been registered/)
     ).toBeTruthy();
     expect(sessionStorage.getItem("auth_pending_approval")).toBe("true");
+  });
+
+  // Deep-links from the new-user notification email must survive the login
+  // round-trip. Store-level unit tests live in src/stores/auth.test.ts; these
+  // drive the real redirect guard, which is where the pop happens.
+
+  // Responses resolve after a few real milliseconds rather than instantly.
+  // Load-bearing: with an immediately-resolved fetch the competing post-auth
+  // navigations land in a favourable order, and these tests pass against a
+  // deep-link return that is actually broken in a browser.
+  const NETWORK_MS = 15;
+
+  /** Let every pending navigation land, so a transient route can't pass as final. */
+  const settle = () => new Promise((resolve) => setTimeout(resolve, NETWORK_MS * 5));
+
+  const respond = (payload: unknown) =>
+    vi.fn((input: RequestInfo | URL) => {
+      const path = getPathname(input);
+      // Collection endpoints must answer with arrays; the shared makeFetch
+      // fallback returns {}, which crashes an {#each} in whichever route
+      // mounts and takes the pending redirect down with it.
+      const body =
+        path === "/me" || path === "/me/"
+          ? payload
+          : path === "/me/dashboard"
+            ? {
+                active_list_count: 0,
+                completed_list_count: 0,
+                templates_count: 0,
+                last_created_lists: [],
+                last_created_templates: [],
+              }
+            : [];
+      return new Promise<Response>((resolve) =>
+        setTimeout(() => resolve(makeJsonResponse(body)), NETWORK_MS)
+      );
+    });
+
+  const signInReturning = (fetchImpl: ReturnType<typeof respond>) => {
+    vi.stubGlobal("fetch", fetchImpl);
+    initGoogleSignInMock.mockImplementation(
+      (_elementId: string, onSuccess: (token: string) => void) => {
+        queueMicrotask(() => onSuccess("jwt-token"));
+        return () => {};
+      }
+    );
+  };
+
+  const signInSucceedsAs = (payload: unknown) => signInReturning(respond(payload));
+
+  it("returns a signed-out admin to the emailed pending-users link after sign-in", async () => {
+    localStorage.clear();
+    sessionStorage.clear();
+    setRoute("/admin/pending-users");
+    signInSucceedsAs({
+      id: "user-1",
+      admin: true,
+      created_at: "2026-01-01T00:00:00Z",
+    });
+
+    const module = await import("./App.svelte");
+    App = module.default;
+
+    render(App);
+
+    // Bounced to login first...
+    await waitForRoute("/login");
+    // ...then back to where the email pointed, not the default landing page.
+    await waitForRoute("/admin/pending-users");
+
+    // And it must *stay* there. waitForRoute is satisfied by a momentary match,
+    // so on its own it passes even when the admin route immediately bounces
+    // back out -- which is what happens if we navigate before the profile
+    // loads, since PendingUsers reads a null user as non-admin.
+    await settle();
+    expect(getRoute()).toBe("/admin/pending-users");
+    expect(sessionStorage.getItem("auth_return_to")).toBeNull();
+  });
+
+  it("discards the emailed return path when sign-in ends in pending approval", async () => {
+    localStorage.clear();
+    sessionStorage.clear();
+    setRoute("/admin/pending-users");
+    signInReturning(
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) =>
+            setTimeout(
+              () =>
+                resolve(
+                  makeJsonResponse({ detail: "Account pending approval." }, 403)
+                ),
+              NETWORK_MS
+            )
+          )
+      )
+    );
+
+    const module = await import("./App.svelte");
+    App = module.default;
+
+    render(App);
+
+    expect(
+      await screen.findByText(/Your account has been registered/)
+    ).toBeTruthy();
+    // Settle before asserting: a rejected sign-in must also not drift off
+    // /login afterwards.
+    await settle();
+    expect(getRoute()).toBe("/login");
+    // The post-auth arm requires a loaded profile, which a 403 never produces,
+    // so nothing consumes the stash. Left behind it would fire at an unrelated
+    // later sign-in in this tab, and approval is a multi-day wait.
+    expect(sessionStorage.getItem("auth_return_to")).toBeNull();
+  });
+
+  it("still lands on the dashboard for a route outside the return allowlist", async () => {
+    localStorage.clear();
+    sessionStorage.clear();
+    setRoute("/lists");
+    signInSucceedsAs({
+      id: "user-1",
+      created_at: "2026-01-01T00:00:00Z",
+    });
+
+    const module = await import("./App.svelte");
+    App = module.default;
+
+    render(App);
+
+    await waitForRoute("/login");
+    // The allowlist has one entry, so every other deep-link behaves exactly as
+    // it did before this feature: no return path, default destination.
+    await waitForRoute("/dashboard");
+
+    // The only *positive* coverage that an ordinary sign-in reaches the
+    // dashboard. Login.test.ts asserts `push` was NOT called with "/dashboard",
+    // which passes vacuously if anything upstream breaks. Settled, not merely
+    // observed: waitForRoute resolves on a momentary match.
+    await settle();
+    expect(getRoute()).toBe("/dashboard");
+    expect(sessionStorage.getItem("auth_return_to")).toBeNull();
   });
 });

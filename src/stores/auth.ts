@@ -6,7 +6,14 @@ const TOKEN_KEY = "auth_token";
 const EXPIRY_KEY = "auth_expiry";
 const NOTICE_KEY = "auth_notice";
 const PENDING_KEY = "auth_pending_approval";
+const RETURN_TO_KEY = "auth_return_to";
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+// Routes an emailed deep-link may return an admin to after sign-in. Seeded from
+// App.svelte's route table, not from the ticket text (which cited the backend
+// path `/me/admin/pending-users`). A literal one-entry list, not a generic
+// internal-path check, so this can never grow into open redirect-preservation.
+const RETURN_TO_ALLOWLIST = ["/admin/pending-users"];
 
 export type AuthState = {
   token: string | null;
@@ -102,6 +109,44 @@ export const isTokenExpired = (expiry: number | null) => {
     return true;
   }
   return Date.now() > expiry;
+};
+
+/** Remember where an emailed deep-link was headed, before we bounce to login. */
+export const captureReturnTo = (path: string) => {
+  if (typeof sessionStorage === "undefined") {
+    return;
+  }
+  // Only capture while signed out. An admin who opens the deep-link with a live
+  // session is never redirected to login, so a stash made here would sit
+  // unclaimed and then fire much later, after an unrelated session expiry.
+  const stored = readStoredAuth();
+  if (stored.token && !isTokenExpired(stored.expiry)) {
+    return;
+  }
+  if (!RETURN_TO_ALLOWLIST.includes(path)) {
+    return;
+  }
+  sessionStorage.setItem(RETURN_TO_KEY, path);
+};
+
+/** Discard a stored return path that will never be consumed: only App.svelte's
+ * post-auth arm pops it, and a 403 sign-in never reaches there, so the stash
+ * would otherwise outlive a multi-day wait for approval.
+ */
+export const clearReturnTo = () => {
+  if (typeof sessionStorage !== "undefined") {
+    sessionStorage.removeItem(RETURN_TO_KEY);
+  }
+};
+
+/** Consume the stored return path. Read-and-remove: it is used at most once. */
+export const takeReturnTo = (): string | null => {
+  if (typeof sessionStorage === "undefined") {
+    return null;
+  }
+  const path = sessionStorage.getItem(RETURN_TO_KEY);
+  sessionStorage.removeItem(RETURN_TO_KEY);
+  return path && RETURN_TO_ALLOWLIST.includes(path) ? path : null;
 };
 
 export const saveToken = (token: string) => {

@@ -8,6 +8,7 @@
     authNoticeStore,
     clearToken,
     clearPendingApproval,
+    clearReturnTo,
     hydrateAuthNotice,
     isPendingApproval,
     saveToken,
@@ -34,12 +35,20 @@
         try {
           const user = await api.getMe();
           setCurrentUser(user);
-          push("/dashboard");
+          // No push here. App.svelte's guard owns the post-auth destination
+          // and has already navigated, since saveToken flips isAuthed
+          // synchronously. A push here lands after it and silently overwrites
+          // an emailed deep-link with the dashboard.
         } catch (err) {
           clearToken();
           if (err instanceof ApiError && err.status === 403) {
             pendingApproval = true;
             setPendingApproval();
+            // Load-bearing, not defensive: only App.svelte's post-auth arm
+            // pops the stash and it needs a populated user, which a 403 never
+            // produces. Left here it resurfaces at an unrelated later sign-in.
+            // Covered in src/App.test.ts.
+            clearReturnTo();
           } else {
             clearPendingApproval();
             error = getApiErrorMessage(err, "Sign in failed.");
