@@ -231,4 +231,82 @@ describe("AdminGroups route", () => {
 
     await waitFor(() => expect(groupNames()).toEqual(["Dairy", "Other"]));
   });
+
+  it("shows a refused rename inline and keeps the form open", async () => {
+    const user = userEvent.setup();
+    apiMock.listGroups.mockResolvedValue([dairy, OTHER_GROUP]);
+    apiMock.renameGroup.mockRejectedValue(
+      new TestApiError(422, "x", '"Other" is built in and cannot be used as a group name.')
+    );
+    render(AdminGroups);
+
+    await user.click(await screen.findByRole("button", { name: "Rename" }));
+    const input = screen.getByLabelText("New name for Dairy");
+    await user.clear(input);
+    await user.type(input, "Other");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect((await screen.findByRole("alert")).textContent).toBe(
+      '"Other" is built in and cannot be used as a group name.'
+    );
+    expect(screen.getByLabelText("New name for Dairy")).toBeTruthy();
+    expect(noticeMessages()).toEqual([]);
+  });
+
+  it.each([
+    ["a move", 400, async (user: ReturnType<typeof userEvent.setup>) => {
+      await user.click(await screen.findByRole("button", { name: "Move Fruit up" }));
+    }],
+    ["a delete", 404, async (user: ReturnType<typeof userEvent.setup>) => {
+      await user.click((await screen.findAllByRole("button", { name: "Delete" }))[0]);
+      await user.click(screen.getByRole("button", { name: "Delete group" }));
+    }],
+    ["a rename", 404, async (user: ReturnType<typeof userEvent.setup>) => {
+      await user.click((await screen.findAllByRole("button", { name: "Rename" }))[0]);
+      await user.type(screen.getByLabelText("New name for Dairy"), "!");
+      await user.click(screen.getByRole("button", { name: "Save" }));
+    }],
+  ])("reloads the latest groups when %s hits another admin's change", async (_label, status, act) => {
+    const user = userEvent.setup();
+    const bakery = makeGroup({ id: "g3", name: "Bakery", position: 0 });
+    apiMock.listGroups
+      .mockResolvedValueOnce([dairy, fruit, OTHER_GROUP])
+      .mockResolvedValue([bakery, fruit, OTHER_GROUP]);
+    apiMock.reorderGroups.mockRejectedValue(new TestApiError(status));
+    apiMock.deleteGroup.mockRejectedValue(new TestApiError(status));
+    apiMock.renameGroup.mockRejectedValue(new TestApiError(status));
+    render(AdminGroups);
+
+    await act(user);
+
+    await waitFor(() => expect(groupNames()).toEqual(["Bakery", "Fruit", "Other"]));
+    expect(noticeMessages()).toEqual(["Someone else changed the groups. Here's the latest list."]);
+  });
+
+  it("locks Save on a rename while a move is still saving", async () => {
+    const user = userEvent.setup();
+    apiMock.listGroups.mockResolvedValue([dairy, fruit, OTHER_GROUP]);
+    apiMock.reorderGroups.mockReturnValue(new Promise(() => {}));
+    render(AdminGroups);
+
+    await user.click((await screen.findAllByRole("button", { name: "Rename" }))[0]);
+    await user.click(screen.getByRole("button", { name: "Move Fruit up" }));
+
+    expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("raises no notice on the next page if a save fails after leaving", async () => {
+    const user = userEvent.setup();
+    apiMock.listGroups.mockResolvedValue([dairy, fruit, OTHER_GROUP]);
+    let fail!: (err: unknown) => void;
+    apiMock.reorderGroups.mockReturnValue(new Promise((_r, reject) => (fail = reject)));
+    const { unmount } = render(AdminGroups);
+
+    await user.click(await screen.findByRole("button", { name: "Move Fruit up" }));
+    unmount();
+    fail(new TestApiError(500));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(noticeMessages()).toEqual([]);
+  });
 });

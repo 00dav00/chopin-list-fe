@@ -4,7 +4,7 @@
   import { api, ApiError } from "../lib/api";
   import ConfirmDialog from "../lib/ConfirmDialog.svelte";
   import { getApiErrorMessage } from "../lib/errors";
-  import { refusalDetail } from "../lib/grouping";
+  import { failureMessage, refusalDetail } from "../lib/grouping";
   import NavMenu from "../lib/NavMenu.svelte";
   import { clearNotices, notify } from "../lib/notices";
   import type { UnmatchedEntryOut } from "../lib/types";
@@ -21,10 +21,17 @@
 
   let pendingDismissId: string | null = null;
   let dismissingId: string | null = null;
+  let destroyed = false;
 
   $: pendingDismiss = entries.find((entry) => entry.id === pendingDismissId) ?? null;
 
   const formatDate = (value: string) => new Date(value).toLocaleDateString();
+
+  const notifyFailure = (err: unknown, message: string) => {
+    if (destroyed) return;
+    const text = failureMessage(err, message);
+    if (text) notify({ message: text, severity: "error" });
+  };
 
   const loadEntries = async () => {
     if (!$authStore.user?.admin) {
@@ -34,8 +41,15 @@
     loading = true;
     loadError = null;
     try {
-      entries = await api.listUnmatchedItems();
+      const loaded = await api.listUnmatchedItems();
+      if (destroyed) return;
+      entries = loaded;
+      // The entry whose form was open may have been handled meanwhile.
+      if (creatingFor && !entries.some((entry) => entry.id === creatingFor)) {
+        creatingFor = null;
+      }
     } catch (err) {
+      if (destroyed) return;
       loadError = getApiErrorMessage(err, "Couldn't load the items.");
     } finally {
       loading = false;
@@ -44,6 +58,7 @@
 
   // Another admin got there first: show the list as it is now.
   const handleGone = async () => {
+    if (destroyed) return;
     notify({ message: "Someone already handled that item.", severity: "warning", autoDismissMs: 5_000 });
     await loadEntries();
   };
@@ -57,7 +72,8 @@
   const openCreate = (entry: UnmatchedEntryOut) => {
     if (saving) return;
     creatingFor = entry.id;
-    groupName = entry.name;
+    // Shared names can run to 200 characters; group names stop at 60.
+    groupName = entry.name.slice(0, 60);
     createError = null;
   };
 
@@ -75,6 +91,7 @@
     createError = null;
     try {
       const group = await api.createGroupFromUnmatched(entryId, { name });
+      if (destroyed) return;
       remove(entryId);
       creatingFor = null;
       notify({ message: `Added the group "${group.name}".`, severity: "success" });
@@ -85,10 +102,7 @@
         return;
       }
       createError = refusalDetail(err);
-      if (!createError) {
-        const message = "Couldn't create the group. Try again.";
-        if (getApiErrorMessage(err, message)) notify({ message, severity: "error" });
-      }
+      if (!createError) notifyFailure(err, "Couldn't create the group. Try again.");
     } finally {
       saving = false;
     }
@@ -105,8 +119,7 @@
       if (isGone(err)) {
         await handleGone();
       } else {
-        const message = "Couldn't dismiss that item. Try again.";
-        if (getApiErrorMessage(err, message)) notify({ message, severity: "error" });
+        notifyFailure(err, "Couldn't dismiss that item. Try again.");
       }
     } finally {
       pendingDismissId = null;
@@ -120,7 +133,10 @@
   };
 
   onMount(loadEntries);
-  onDestroy(clearNotices);
+  onDestroy(() => {
+    destroyed = true;
+    clearNotices();
+  });
 </script>
 
 <main>
@@ -228,9 +244,5 @@
 
   .unmatched-name {
     font-weight: 600;
-  }
-
-  .field-error {
-    color: #b3261e;
   }
 </style>

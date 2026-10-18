@@ -171,4 +171,78 @@ describe("UnmatchedItems route", () => {
 
     await waitFor(() => expect(entryNames()).toEqual(["birthday card"]));
   });
+
+  it("trims a long shared name to the 60 characters a group name allows", async () => {
+    const user = userEvent.setup();
+    const long = makeUnmatchedEntry({ id: "e9", name: "x".repeat(120) });
+    apiMock.listUnmatchedItems.mockResolvedValue([long]);
+    render(UnmatchedItems);
+
+    await user.click(await screen.findByRole("button", { name: `Create a group from ${"x".repeat(120)}` }));
+
+    expect((screen.getByLabelText("Group name") as HTMLInputElement).value).toBe("x".repeat(60));
+  });
+
+  it("reports a failed create and keeps the form open", async () => {
+    const user = userEvent.setup();
+    apiMock.listUnmatchedItems.mockResolvedValue([card]);
+    apiMock.createGroupFromUnmatched.mockRejectedValue(new TestApiError(500));
+    render(UnmatchedItems);
+
+    await user.click(await screen.findByRole("button", { name: "Create a group from birthday card" }));
+    await user.click(screen.getByRole("button", { name: "Create group" }));
+
+    await waitFor(() =>
+      expect(noticeMessages()).toEqual(["Couldn't create the group. Try again."])
+    );
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByLabelText("Group name")).toBeTruthy();
+  });
+
+  it("refreshes when a dismissed name was already handled", async () => {
+    const user = userEvent.setup();
+    apiMock.listUnmatchedItems
+      .mockResolvedValueOnce([card, tahini])
+      .mockResolvedValue([card]);
+    apiMock.dismissUnmatchedItem.mockRejectedValue(new TestApiError(404));
+    render(UnmatchedItems);
+
+    await user.click((await screen.findAllByRole("button", { name: "Dismiss" }))[1]);
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Dismiss" }));
+
+    await waitFor(() => expect(entryNames()).toEqual(["birthday card"]));
+    expect(noticeMessages()).toEqual(["Someone already handled that item."]);
+  });
+
+  it("reports a failed dismiss and keeps the name", async () => {
+    const user = userEvent.setup();
+    apiMock.listUnmatchedItems.mockResolvedValue([card]);
+    apiMock.dismissUnmatchedItem.mockRejectedValue(new TestApiError(500));
+    render(UnmatchedItems);
+
+    await user.click(await screen.findByRole("button", { name: "Dismiss" }));
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Dismiss" }));
+
+    await waitFor(() =>
+      expect(noticeMessages()).toEqual(["Couldn't dismiss that item. Try again."])
+    );
+    expect(entryNames()).toEqual(["birthday card"]);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("raises no notice on the next page if a create fails after leaving", async () => {
+    const user = userEvent.setup();
+    apiMock.listUnmatchedItems.mockResolvedValue([card]);
+    let fail!: (err: unknown) => void;
+    apiMock.createGroupFromUnmatched.mockReturnValue(new Promise((_r, reject) => (fail = reject)));
+    const { unmount } = render(UnmatchedItems);
+
+    await user.click(await screen.findByRole("button", { name: "Create a group from birthday card" }));
+    await user.click(screen.getByRole("button", { name: "Create group" }));
+    unmount();
+    fail(new TestApiError(500));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(noticeMessages()).toEqual([]);
+  });
 });

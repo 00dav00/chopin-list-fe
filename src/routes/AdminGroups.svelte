@@ -1,10 +1,10 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
   import { push } from "svelte-spa-router";
-  import { api } from "../lib/api";
+  import { api, ApiError } from "../lib/api";
   import ConfirmDialog from "../lib/ConfirmDialog.svelte";
   import { getApiErrorMessage } from "../lib/errors";
-  import { refusalDetail } from "../lib/grouping";
+  import { failureMessage, refusalDetail } from "../lib/grouping";
   import NavMenu from "../lib/NavMenu.svelte";
   import { clearNotices, notify } from "../lib/notices";
   import type { GroupOut } from "../lib/types";
@@ -26,6 +26,7 @@
   let pendingDeleteId: string | null = null;
   let deletingId: string | null = null;
   let moving = false;
+  let destroyed = false;
 
   // "Other" is built in and always last; only stored groups can change.
   $: stored = groups.filter((group) => !group.built_in);
@@ -33,7 +34,26 @@
   $: pendingDelete = groups.find((group) => group.id === pendingDeleteId) ?? null;
 
   const notifyFailure = (err: unknown, message: string) => {
-    if (getApiErrorMessage(err, message)) notify({ message, severity: "error" });
+    if (destroyed) return;
+    const text = failureMessage(err, message);
+    if (text) notify({ message: text, severity: "error" });
+  };
+
+  // Another admin changed the groups since this page loaded: a group is gone
+  // (404) or the reorder no longer names every group (400). Show the latest.
+  const isStale = (err: unknown) =>
+    err instanceof ApiError && (err.status === 404 || err.status === 400);
+
+  const reloadStale = async () => {
+    if (destroyed) return;
+    editingId = null;
+    renameError = null;
+    notify({
+      message: "Someone else changed the groups. Here's the latest list.",
+      severity: "warning",
+      autoDismissMs: 5_000,
+    });
+    await loadGroups();
   };
 
   const loadGroups = async () => {
@@ -44,8 +64,11 @@
     loading = true;
     loadError = null;
     try {
-      groups = await api.listGroups();
+      const loaded = await api.listGroups();
+      if (destroyed) return;
+      groups = loaded;
     } catch (err) {
+      if (destroyed) return;
       loadError = getApiErrorMessage(err, "Couldn't load the groups.");
     } finally {
       loading = false;
@@ -84,7 +107,8 @@
 
   const saveRename = async (groupId: string) => {
     const name = editName.trim();
-    if (!name || savingId) return;
+    // A rename landing while a reorder is saving could be reverted by its rollback.
+    if (!name || busy) return;
     savingId = groupId;
     renameError = null;
     try {
@@ -92,6 +116,10 @@
       groups = groups.map((group) => (group.id === groupId ? renamed : group));
       editingId = null;
     } catch (err) {
+      if (isStale(err)) {
+        await reloadStale();
+        return;
+      }
       renameError = refusalDetail(err);
       if (!renameError) notifyFailure(err, "Couldn't rename the group. Try again.");
     } finally {
@@ -110,6 +138,10 @@
     try {
       groups = await api.reorderGroups(reordered.map((group) => group.id));
     } catch (err) {
+      if (isStale(err)) {
+        await reloadStale();
+        return;
+      }
       groups = previous;
       notifyFailure(err, "Couldn't save the new order — the groups are back to how they were.");
     } finally {
@@ -127,6 +159,10 @@
       pendingDeleteId = null;
     } catch (err) {
       pendingDeleteId = null;
+      if (isStale(err)) {
+        await reloadStale();
+        return;
+      }
       notifyFailure(err, "Couldn't delete the group. Try again.");
     } finally {
       deletingId = null;
@@ -139,7 +175,10 @@
   };
 
   onMount(loadGroups);
-  onDestroy(clearNotices);
+  onDestroy(() => {
+    destroyed = true;
+    clearNotices();
+  });
 </script>
 
 <main>
@@ -179,13 +218,14 @@
                 <input
                   class="input"
                   aria-label={`New name for ${group.name}`}
+                  maxlength="60"
                   bind:value={editName}
                 />
                 <div class="toolbar">
                   <button
                     class="button"
                     type="button"
-                    disabled={savingId !== null}
+                    disabled={busy}
                     on:click={() => saveRename(group.id)}
                   >
                     {savingId === group.id ? "Saving..." : "Save"}
@@ -295,9 +335,5 @@
 
   .group-name {
     font-weight: 600;
-  }
-
-  .field-error {
-    color: #b3261e;
   }
 </style>

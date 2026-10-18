@@ -55,4 +55,11 @@ describe("refusalDetail", () => {
     expect(refusalDetail(new ApiError(500, "x", "Boom."))).toBeNull();
     expect(refusalDetail(new Error("x"))).toBeNull();
   });
+
+  it("ignores a validation 422 whose detail is a list, not text", () => {
+    const err = new ApiError(422, "x");
+    (err as { detail?: unknown }).detail = [{ loc: ["body", "name"], msg: "too long" }];
+
+    expect(refusalDetail(err)).toBeNull();
+  });
 });
