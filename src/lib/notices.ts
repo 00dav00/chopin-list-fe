@@ -1,6 +1,6 @@
 import { get, writable } from "svelte/store";
 
-export type NoticeSeverity = "error" | "warning";
+export type NoticeSeverity = "error" | "warning" | "success";
 
 export interface Notice {
   id: string;
@@ -21,6 +21,7 @@ const MAX_VISIBLE = 3;
 const DEFAULT_AUTO_DISMISS_MS: Record<NoticeSeverity, number | null> = {
   error: 5_000,
   warning: null, // partial-success / actionable: persist until dismissed
+  success: 4_000,
 };
 
 // Newest notice is last in the array (rendered at the bottom of the stack).

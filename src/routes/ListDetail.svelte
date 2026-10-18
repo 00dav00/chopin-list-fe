@@ -3,9 +3,11 @@
   import { api, ApiError } from "../lib/api";
   import ConfirmDialog from "../lib/ConfirmDialog.svelte";
   import { getApiErrorMessage } from "../lib/errors";
+  import { groupingErrorMessage, mergeGroupedItems } from "../lib/grouping";
   import { notify, clearNotices } from "../lib/notices";
   import NavMenu from "../lib/NavMenu.svelte";
-  import type { ItemOut, ListOut } from "../lib/types";
+  import type { ItemOut, ListOut, UnmatchedItemOut } from "../lib/types";
+  import UnmatchedItemsDialog from "../lib/UnmatchedItemsDialog.svelte";
   import { authStore } from "../stores/auth";
 
   // Time between a refetch failure and the offline banner mounting.
@@ -46,6 +48,12 @@
   let pendingDeleteItemId: string | null = null;
   let deletingItemId: string | null = null;
   let reorderingItems = false;
+  let groupingItems = false;
+  // Bumped on list switch so a grouping for the previous list can't touch
+  // this list's state when it finally answers.
+  let groupRunToken = 0;
+  let unmatchedRun: { runId: string; unmatched: UnmatchedItemOut[] } | null = null;
+  let destroyed = false;
   let draggedItemId: string | null = null;
   let dragOverItemId: string | null = null;
 
@@ -109,10 +117,12 @@
       );
     });
 
+  // Never below the list size: grouping renumbers 0..N-1, so an item added
+  // while it runs must still sort after the grouped ones.
   const nextSortOrder = (currentItems: ItemOut[]) =>
     currentItems.reduce((maxSortOrder, item) => {
       return item.sort_order > maxSortOrder ? item.sort_order : maxSortOrder;
-    }, 0) + 1;
+    }, currentItems.length) + 1;
 
   const moveItem = (
     currentItems: ItemOut[],
@@ -289,6 +299,10 @@
   // the in-flight request guarantee no late-resolving fetch can write into
   // the new list's view.
   const resetRefetchState = () => {
+    groupRunToken++;
+    groupingItems = false;
+    reorderingItems = false;
+    unmatchedRun = null;
     refetchCounter++;
     inflightController?.abort();
     inflightController = null;
@@ -317,6 +331,7 @@
   });
 
   onDestroy(() => {
+    destroyed = true;
     if (typeof document !== "undefined") {
       document.removeEventListener("visibilitychange", onVisibilityChange);
     }
@@ -387,7 +402,9 @@
         );
         items = sortItems(updated);
       } else {
-        items = sortItems([...previousItems, created]);
+        // Current items, not the pre-request copy: a grouping that finished
+        // meanwhile must not be undone.
+        items = sortItems([...items, created]);
       }
       newItemName = "";
       newItemQty = "1";
@@ -401,7 +418,7 @@
         // list is still fully visible: the copy regains the guidance the
         // user needs ("drag it to reorder") now that the list isn't hidden.
         // Local state appends the item so the list reflects reality.
-        items = sortItems([...previousItems, created]);
+        items = sortItems([...items, created]);
         notify({
           message:
             "Item added, but we couldn't place it where you wanted — it's at the bottom. Drag it to reorder.",
@@ -653,6 +670,38 @@
     }
   };
 
+  const groupItems = async () => {
+    if (!list || groupingItems || reorderingItems || isListCompleted) return;
+    if (unpurchasedItems.length === 0) return;
+    const listId = list.id;
+    const token = ++groupRunToken;
+    const isCurrent = () => !destroyed && token === groupRunToken;
+    // reorderingItems blocks drag and gap inserts and holds back refetches.
+    groupingItems = true;
+    reorderingItems = true;
+    try {
+      const result = await api.groupListItems(listId);
+      if (!isCurrent()) return;
+      items = sortItems(mergeGroupedItems(result.items, items));
+      // A refetch held back during the wait carries the pre-grouping order.
+      bufferedRefetch = null;
+      if (result.run_id && result.unmatched.length > 0) {
+        unmatchedRun = { runId: result.run_id, unmatched: result.unmatched };
+      }
+    } catch (err) {
+      if (!isCurrent()) return;
+      const message = groupingErrorMessage(err);
+      if (message) notify({ message, severity: "error" });
+    } finally {
+      if (isCurrent()) {
+        groupingItems = false;
+        reorderingItems = false;
+      }
+    }
+    // Picks up adds or ticks from other tabs that the server re-read missed.
+    if (isCurrent()) void backgroundRefetch();
+  };
+
   const completeCurrentList = async () => {
     if (!list || completingList || activatingList) return;
     completingList = true;
@@ -757,6 +806,24 @@
               Mark active
             </button>
           {:else}
+            <button
+              class="button ghost"
+              type="button"
+              aria-busy={groupingItems}
+              disabled={
+                groupingItems ||
+                reorderingItems ||
+                unpurchasedItems.length === 0 ||
+                completingList
+              }
+              on:click={groupItems}
+            >
+              {#if groupingItems}
+                <span class="spinner" aria-hidden="true"></span>Grouping...
+              {:else}
+                Group by kind
+              {/if}
+            </button>
             <button
               class="button ghost"
               disabled={activatingList || completingList}
@@ -977,6 +1044,11 @@
       Add item
     </button>
   {/if}
+  <UnmatchedItemsDialog
+    runId={unmatchedRun?.runId ?? null}
+    unmatched={unmatchedRun?.unmatched ?? []}
+    on:close={() => (unmatchedRun = null)}
+  />
 </main>
 
 {#if addItemModalOpen}

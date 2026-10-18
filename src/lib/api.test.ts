@@ -309,4 +309,75 @@ describe("api client", () => {
     expect(fetchMock.mock.calls[2]?.[0]).toContain("/me/admin/users/user-8");
     expect((fetchMock.mock.calls[2]?.[1] as RequestInit).method).toBe("DELETE");
   });
+
+  describe("group by kind", () => {
+    it("posts to the list and template group endpoints with no body", async () => {
+      const fetchMock = vi
+        .fn()
+        .mockImplementation(
+          () =>
+            new Response('{"items":[],"run_id":null,"unmatched":[]}', {
+              status: 200,
+            })
+        );
+      vi.stubGlobal("fetch", fetchMock);
+
+      const apiModule = await import("./api");
+      await apiModule.api.groupListItems("list-1");
+      await apiModule.api.groupTemplateItems("tpl-1");
+
+      expect(fetchMock.mock.calls[0]?.[0]).toContain("/lists/list-1/group");
+      expect(fetchMock.mock.calls[1]?.[0]).toContain("/templates/tpl-1/group");
+      for (const call of fetchMock.mock.calls) {
+        const init = call[1] as RequestInit;
+        expect(init.method).toBe("POST");
+        expect(init.body).toBeUndefined();
+      }
+    });
+
+    it("aborts a hung grouping request after its timeout", async () => {
+      vi.useFakeTimers();
+      try {
+        vi.stubGlobal(
+          "fetch",
+          vi.fn().mockImplementation((_url, init: RequestInit) => {
+            return new Promise((_resolve, reject) => {
+              init.signal?.addEventListener("abort", () => {
+                reject(new DOMException("Aborted", "AbortError"));
+              });
+            });
+          })
+        );
+
+        const apiModule = await import("./api");
+        const promise = apiModule.api.groupListItems("list-1");
+        const outcome = expect(promise).rejects.toMatchObject({ name: "AbortError" });
+        await vi.advanceTimersByTimeAsync(apiModule.GROUPING_TIMEOUT_MS - 1);
+        let settled = false;
+        promise.catch(() => (settled = true));
+        await Promise.resolve();
+        expect(settled).toBe(false);
+        await vi.advanceTimersByTimeAsync(1);
+        await outcome;
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("sends a grouping run by id with no body", async () => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(new Response('{"sent":true}', { status: 200 }));
+      vi.stubGlobal("fetch", fetchMock);
+
+      const apiModule = await import("./api");
+      const result = await apiModule.api.sendGroupingRun("run-9");
+
+      expect(result).toEqual({ sent: true });
+      expect(fetchMock.mock.calls[0]?.[0]).toContain("/grouping-runs/run-9/send");
+      const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
+      expect(init.method).toBe("POST");
+      expect(init.body).toBeUndefined();
+    });
+  });
 });

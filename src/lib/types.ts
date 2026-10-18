@@ -153,3 +153,24 @@ export type DashboardOut = {
   last_created_lists: DashboardListOut[];
   last_created_templates: DashboardTemplateOut[];
 };
+
+export type UnmatchedItemOut = {
+  item_id: string;
+  name: string;
+};
+
+export type ListGroupingOut = {
+  items: ItemOut[];
+  run_id: string | null;
+  unmatched: UnmatchedItemOut[];
+};
+
+export type TemplateGroupingOut = {
+  items: TemplateItemOut[];
+  run_id: string | null;
+  unmatched: UnmatchedItemOut[];
+};
+
+export type SendRunOut = {
+  sent: boolean;
+};
