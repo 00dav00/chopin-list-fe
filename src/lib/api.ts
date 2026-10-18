@@ -20,6 +20,10 @@ import type {
   ListGroupingOut,
   TemplateGroupingOut,
   SendRunOut,
+  GroupOut,
+  GroupCreate,
+  GroupUpdate,
+  UnmatchedEntryOut,
 } from "./types";
 
 export type { GetListResult } from "./types";
@@ -305,5 +309,36 @@ export const api = {
   deletePendingUser: (userId: string) =>
     fetchJson<null>(`/me/admin/users/${userId}`, {
       method: "DELETE",
+    }),
+
+  listGroups: () => fetchJson<GroupOut[]>("/me/admin/groups"),
+  createGroup: (payload: GroupCreate) =>
+    fetchJson<GroupOut>("/me/admin/groups", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  renameGroup: (groupId: string, payload: GroupUpdate) =>
+    fetchJson<GroupOut>(`/me/admin/groups/${groupId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  deleteGroup: (groupId: string) =>
+    fetchJson<null>(`/me/admin/groups/${groupId}`, { method: "DELETE" }),
+  reorderGroups: (groupIds: string[]) =>
+    fetchJson<GroupOut[]>("/me/admin/groups/reorder", {
+      method: "POST",
+      body: JSON.stringify({ group_ids: groupIds }),
+    }),
+
+  listUnmatchedItems: () =>
+    fetchJson<UnmatchedEntryOut[]>("/me/admin/unmatched-items"),
+  createGroupFromUnmatched: (entryId: string, payload: GroupCreate) =>
+    fetchJson<GroupOut>(`/me/admin/unmatched-items/${entryId}/create-group`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  dismissUnmatchedItem: (entryId: string) =>
+    fetchJson<null>(`/me/admin/unmatched-items/${entryId}/dismiss`, {
+      method: "POST",
     }),
 };

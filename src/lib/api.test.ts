@@ -380,4 +380,37 @@ describe("api client", () => {
       expect(init.body).toBeUndefined();
     });
   });
+
+  it("hits the admin group and unmatched-item endpoints", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockImplementation(() => new Response("[]", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const apiModule = await import("./api");
+    await apiModule.api.listGroups();
+    await apiModule.api.createGroup({ name: "Dairy" });
+    await apiModule.api.renameGroup("g1", { name: "Dairy & eggs" });
+    await apiModule.api.deleteGroup("g1");
+    await apiModule.api.reorderGroups(["g2", "g1"]);
+    await apiModule.api.listUnmatchedItems();
+    await apiModule.api.createGroupFromUnmatched("e1", { name: "Cards" });
+    await apiModule.api.dismissUnmatchedItem("e1");
+
+    const calls = fetchMock.mock.calls.map(([url, init]) => [
+      String(url).replace(/^.*?(\/me)/, "$1"),
+      (init as RequestInit).method ?? "GET",
+      (init as RequestInit).body ?? null,
+    ]);
+    expect(calls).toEqual([
+      ["/me/admin/groups", "GET", null],
+      ["/me/admin/groups", "POST", '{"name":"Dairy"}'],
+      ["/me/admin/groups/g1", "PATCH", '{"name":"Dairy & eggs"}'],
+      ["/me/admin/groups/g1", "DELETE", null],
+      ["/me/admin/groups/reorder", "POST", '{"group_ids":["g2","g1"]}'],
+      ["/me/admin/unmatched-items", "GET", null],
+      ["/me/admin/unmatched-items/e1/create-group", "POST", '{"name":"Cards"}'],
+      ["/me/admin/unmatched-items/e1/dismiss", "POST", null],
+    ]);
+  });
 });

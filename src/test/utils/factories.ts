@@ -1,9 +1,11 @@
 import type {
+  GroupOut,
   ItemOut,
   ListOut,
   TemplateDetailOut,
   TemplateItemOut,
   TemplateOut,
+  UnmatchedEntryOut,
 } from "../../lib/types";
 
 type ListOverrides = Partial<ListOut>;
@@ -70,5 +72,30 @@ export const makeTemplateDetail = (
 ): TemplateDetailOut => ({
   ...makeTemplate(overrides),
   items: [],
+  ...overrides,
+});
+
+export const makeGroup = (overrides: Partial<GroupOut> = {}): GroupOut => ({
+  id: "group-1",
+  name: "Dairy",
+  position: 0,
+  built_in: false,
+  ...overrides,
+});
+
+export const OTHER_GROUP: GroupOut = {
+  id: "other",
+  name: "Other",
+  position: 99,
+  built_in: true,
+};
+
+export const makeUnmatchedEntry = (
+  overrides: Partial<UnmatchedEntryOut> = {}
+): UnmatchedEntryOut => ({
+  id: "entry-1",
+  name: "birthday card",
+  count: 1,
+  last_sent_at: "2026-10-18T10:00:00Z",
   ...overrides,
 });

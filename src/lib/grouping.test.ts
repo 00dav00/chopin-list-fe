@@ -4,6 +4,7 @@ import {
   GROUPING_RETRY_MESSAGE,
   groupingErrorMessage,
   mergeGroupedItems,
+  refusalDetail,
 } from "./grouping";
 
 describe("mergeGroupedItems", () => {
@@ -43,5 +44,22 @@ describe("groupingErrorMessage", () => {
     ["a 409 without detail", new ApiError(409, "x")],
   ])("asks to try again for %s", (_label, err) => {
     expect(groupingErrorMessage(err)).toBe(GROUPING_RETRY_MESSAGE);
+  });
+});
+
+describe("refusalDetail", () => {
+  it("returns the server's copy only for 409/422 with a detail", () => {
+    expect(refusalDetail(new ApiError(409, "x", "Taken."))).toBe("Taken.");
+    expect(refusalDetail(new ApiError(422, "x", "Reserved."))).toBe("Reserved.");
+    expect(refusalDetail(new ApiError(409, "x"))).toBeNull();
+    expect(refusalDetail(new ApiError(500, "x", "Boom."))).toBeNull();
+    expect(refusalDetail(new Error("x"))).toBeNull();
+  });
+
+  it("ignores a validation 422 whose detail is a list, not text", () => {
+    const err = new ApiError(422, "x");
+    (err as { detail?: unknown }).detail = [{ loc: ["body", "name"], msg: "too long" }];
+
+    expect(refusalDetail(err)).toBeNull();
   });
 });

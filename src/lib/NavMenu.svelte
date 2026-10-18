@@ -88,6 +88,14 @@
           <button class="button ghost nav-menu-item" on:click={() => navigate("/admin/active-users")}>Active</button>
           <button class="button ghost nav-menu-item" on:click={() => navigate("/admin/pending-users")}>Pending</button>
         </div>
+
+        <div class="nav-menu-divider" role="separator"></div>
+
+        <div class="nav-menu-group">
+          <p class="nav-menu-label">Grouping</p>
+          <button class="button ghost nav-menu-item" on:click={() => navigate("/admin/groups")}>Groups</button>
+          <button class="button ghost nav-menu-item" on:click={() => navigate("/admin/unmatched-items")}>Unmatched items</button>
+        </div>
       {/if}
 
       <div class="nav-menu-divider" role="separator"></div>

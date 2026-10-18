@@ -174,3 +174,25 @@ export type TemplateGroupingOut = {
 export type SendRunOut = {
   sent: boolean;
 };
+
+export type GroupOut = {
+  id: string;
+  name: string;
+  position: number;
+  built_in: boolean;
+};
+
+export type GroupCreate = {
+  name: string;
+};
+
+export type GroupUpdate = {
+  name: string;
+};
+
+export type UnmatchedEntryOut = {
+  id: string;
+  name: string;
+  count: number;
+  last_sent_at: string;
+};

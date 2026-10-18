@@ -633,3 +633,8 @@ p {
   margin: 0;
   padding-left: 1.2rem;
 }
+
+/* Inline validation copy next to a form field. */
+.field-error {
+  color: #b3261e;
+}
