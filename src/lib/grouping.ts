@@ -17,18 +17,17 @@ export const mergeGroupedItems = <T extends { id: string }>(
   return [...grouped, ...local.filter((item) => !returned.has(item.id))];
 };
 
+/** The server's own copy for a refusal (409/422), which is written for people. */
+export const refusalDetail = (err: unknown): string | null =>
+  err instanceof ApiError && (err.status === 409 || err.status === 422) && err.detail
+    ? err.detail
+    : null;
+
 /**
  * Copy for a failed grouping, or null to stay silent (401 re-auth). Refusals
- * (409/422) carry human copy from the server; anything else is "try again".
+ * carry the server's copy; anything else is "try again".
  */
 export const groupingErrorMessage = (err: unknown): string | null => {
   if (!getApiErrorMessage(err, GROUPING_RETRY_MESSAGE)) return null;
-  if (
-    err instanceof ApiError &&
-    (err.status === 409 || err.status === 422) &&
-    err.detail
-  ) {
-    return err.detail;
-  }
-  return GROUPING_RETRY_MESSAGE;
+  return refusalDetail(err) ?? GROUPING_RETRY_MESSAGE;
 };
