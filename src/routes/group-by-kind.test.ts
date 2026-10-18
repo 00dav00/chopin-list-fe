@@ -274,6 +274,114 @@ describe("Group by kind on a list", () => {
   });
 });
 
+describe("Group by kind on a list: overlapping events", () => {
+  const grouped = () => [item("i2", "Apples", 0), item("i1", "Milk", 1), item("i3", "Birthday card", 2)];
+
+  beforeEach(() => {
+    Object.values(apiMock).forEach((fn) => fn.mockReset());
+    clearNotices();
+    authStore.set({ token: null, expiry: null, user: null, ready: true });
+  });
+
+  it("drops a refetch held back during the wait instead of undoing the grouping", async () => {
+    const user = userEvent.setup();
+    seedList();
+    const pending = deferred<unknown>();
+    apiMock.groupListItems.mockReturnValue(pending.promise);
+    render(ListDetail, { props: { params: { listId } } });
+    await user.click(await groupButton());
+    await screen.findByRole("button", { name: /Grouping/ });
+
+    // Set up only now: clicking can itself fire a focus refetch before the wait.
+    // The refetch during the wait sees the old order; the one after says "unchanged".
+    apiMock.getListWithEtag.mockReset();
+    apiMock.getListWithEtag
+      .mockResolvedValueOnce({ status: 200, etag: 'W/"1"', list: makeList({ id: listId }) })
+      .mockResolvedValue({ status: 304, etag: 'W/"2"' });
+    const itemFetches = apiMock.listItems.mock.calls.length;
+    window.dispatchEvent(new Event("focus"));
+    await waitFor(() => expect(apiMock.listItems).toHaveBeenCalledTimes(itemFetches + 1));
+    // Let the stale payload land in the held-back buffer before grouping answers.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    pending.resolve({ items: grouped(), run_id: null, unmatched: [] });
+
+    await waitFor(() => expect(apiMock.getListWithEtag).toHaveBeenCalledTimes(2));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    // A stale order hides in page state until the next change rebuilds the
+    // list from it, so tick an item and check the rest keep the grouped order.
+    apiMock.toggleItem.mockResolvedValue(item("i3", "Birthday card", 2, true));
+    await user.click(screen.getByRole("checkbox", { name: "Purchased Birthday card" }));
+    await waitFor(() => expect(apiMock.toggleItem).toHaveBeenCalledWith("i3"));
+    await waitFor(() => expect(headings()).toEqual(["Apples", "Milk"]));
+  });
+
+  it("frees the next list when the shopper switches lists mid-grouping", async () => {
+    const user = userEvent.setup();
+    seedList();
+    const pending = deferred<unknown>();
+    apiMock.groupListItems.mockReturnValue(pending.promise);
+    const { component } = render(ListDetail, { props: { params: { listId } } });
+    await user.click(await groupButton());
+
+    apiMock.getList.mockResolvedValue(makeList({ id: "list-2", name: "Party" }));
+    apiMock.listItems.mockResolvedValue([makeItem({ id: "j1", name: "Cups", list_id: "list-2" })]);
+    await component.$set({ params: { listId: "list-2" } });
+    await waitFor(() => expect(headings()).toEqual(["Cups"]));
+
+    const button = (await screen.findByRole("button", { name: "Group by kind" })) as HTMLButtonElement;
+    expect(button.disabled).toBe(false);
+    pending.resolve({
+      items: grouped(),
+      run_id: "run-old",
+      unmatched: [{ item_id: "i3", name: "Birthday card" }],
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(headings()).toEqual(["Cups"]);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("closes an open unmatched dialog when the shopper switches lists", async () => {
+    const user = userEvent.setup();
+    seedList();
+    apiMock.groupListItems.mockResolvedValue({
+      items: grouped(),
+      run_id: "run-1",
+      unmatched: [{ item_id: "i3", name: "Birthday card" }],
+    });
+    const { component } = render(ListDetail, { props: { params: { listId } } });
+    await user.click(await groupButton());
+    await screen.findByRole("dialog");
+
+    apiMock.getList.mockResolvedValue(makeList({ id: "list-2", name: "Party" }));
+    apiMock.listItems.mockResolvedValue([]);
+    await component.$set({ params: { listId: "list-2" } });
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("does nothing after a successful grouping finishes off the page", async () => {
+    const user = userEvent.setup();
+    seedList();
+    const pending = deferred<unknown>();
+    apiMock.groupListItems.mockReturnValue(pending.promise);
+    const { unmount } = render(ListDetail, { props: { params: { listId } } });
+    await user.click(await groupButton());
+    const refetches = apiMock.getListWithEtag.mock.calls.length;
+
+    unmount();
+    pending.resolve({
+      items: grouped(),
+      run_id: "run-1",
+      unmatched: [{ item_id: "i3", name: "Birthday card" }],
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(apiMock.getListWithEtag.mock.calls.length).toBe(refetches);
+    expect(noticeMessages()).toEqual([]);
+  });
+});
+
 describe("Group by kind on a template", () => {
   const templateId = "tpl-1";
   const tItem = (id: string, name: string, sort_order: number) =>
@@ -306,6 +414,37 @@ describe("Group by kind on a template", () => {
     expect(apiMock.groupTemplateItems).toHaveBeenCalledWith(templateId);
     expect((await screen.findByRole("dialog")).textContent).toContain("Card");
     expect(apiMock.getListWithEtag).not.toHaveBeenCalled();
+  });
+
+  it("keeps an item added during the wait, after the grouped items", async () => {
+    const user = userEvent.setup();
+    apiMock.getTemplate.mockResolvedValue(
+      makeTemplateDetail({
+        id: templateId,
+        items: [tItem("t1", "Milk", 0), tItem("t2", "Apples", 1)],
+      })
+    );
+    const pending = deferred<unknown>();
+    apiMock.groupTemplateItems.mockReturnValue(pending.promise);
+    apiMock.createTemplateItem.mockImplementation(async (_id, payload) =>
+      tItem("t3", payload.name, payload.sort_order)
+    );
+    render(TemplateDetail, { props: { params: { templateId } } });
+
+    await user.click(await groupButton());
+    await user.click(screen.getByRole("button", { name: "Add item" }));
+    await user.type(await screen.findByPlaceholderText("Item name"), "Eggs");
+    await user.click(screen.getByRole("button", { name: "Create item" }));
+    await waitFor(() => expect(headings()).toContain("Eggs"));
+    expect(apiMock.createTemplateItem.mock.calls[0][1].sort_order).toBeGreaterThan(2);
+
+    pending.resolve({
+      items: [tItem("t2", "Apples", 0), tItem("t1", "Milk", 1)],
+      run_id: null,
+      unmatched: [],
+    });
+
+    await waitFor(() => expect(headings()).toEqual(["Apples", "Milk", "Eggs"]));
   });
 
   it("is disabled on an empty template", async () => {

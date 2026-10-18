@@ -50,6 +50,9 @@
 
   let reorderingItems = false;
   let groupingItems = false;
+  // Bumped on template switch so a grouping for the previous template can't
+  // touch this template's state when it finally answers.
+  let groupRunToken = 0;
   let unmatchedRun: { runId: string; unmatched: UnmatchedItemOut[] } | null = null;
   let destroyed = false;
   let draggedItemId: string | null = null;
@@ -466,6 +469,10 @@
     if (currentTemplateId) {
       // Switching templates mid-session: drop the previous template's notices.
       clearNotices();
+      groupRunToken++;
+      groupingItems = false;
+      reorderingItems = false;
+      unmatchedRun = null;
     }
     currentTemplateId = params.templateId;
     loadTemplate(currentTemplateId);
@@ -480,23 +487,27 @@
   const groupItems = async () => {
     if (!template || groupingItems || reorderingItems || items.length === 0) return;
     const templateId = template.id;
+    const token = ++groupRunToken;
+    const isCurrent = () => !destroyed && token === groupRunToken;
     // reorderingItems blocks drag, up/down and gap inserts while this runs.
     groupingItems = true;
     reorderingItems = true;
     try {
       const result = await api.groupTemplateItems(templateId);
-      if (destroyed || templateId !== currentTemplateId) return;
+      if (!isCurrent()) return;
       items = sortItems(mergeGroupedItems(result.items, items));
       if (result.run_id && result.unmatched.length > 0) {
         unmatchedRun = { runId: result.run_id, unmatched: result.unmatched };
       }
     } catch (err) {
-      if (destroyed || templateId !== currentTemplateId) return;
+      if (!isCurrent()) return;
       const message = groupingErrorMessage(err);
       if (message) notify({ message, severity: "error" });
     } finally {
-      groupingItems = false;
-      reorderingItems = false;
+      if (isCurrent()) {
+        groupingItems = false;
+        reorderingItems = false;
+      }
     }
   };
 </script>

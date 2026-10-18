@@ -49,6 +49,9 @@
   let deletingItemId: string | null = null;
   let reorderingItems = false;
   let groupingItems = false;
+  // Bumped on list switch so a grouping for the previous list can't touch
+  // this list's state when it finally answers.
+  let groupRunToken = 0;
   let unmatchedRun: { runId: string; unmatched: UnmatchedItemOut[] } | null = null;
   let destroyed = false;
   let draggedItemId: string | null = null;
@@ -296,6 +299,10 @@
   // the in-flight request guarantee no late-resolving fetch can write into
   // the new list's view.
   const resetRefetchState = () => {
+    groupRunToken++;
+    groupingItems = false;
+    reorderingItems = false;
+    unmatchedRun = null;
     refetchCounter++;
     inflightController?.abort();
     inflightController = null;
@@ -667,26 +674,32 @@
     if (!list || groupingItems || reorderingItems || isListCompleted) return;
     if (unpurchasedItems.length === 0) return;
     const listId = list.id;
+    const token = ++groupRunToken;
+    const isCurrent = () => !destroyed && token === groupRunToken;
     // reorderingItems blocks drag and gap inserts and holds back refetches.
     groupingItems = true;
     reorderingItems = true;
     try {
       const result = await api.groupListItems(listId);
-      if (destroyed || listId !== currentListId) return;
+      if (!isCurrent()) return;
       items = sortItems(mergeGroupedItems(result.items, items));
+      // A refetch held back during the wait carries the pre-grouping order.
+      bufferedRefetch = null;
       if (result.run_id && result.unmatched.length > 0) {
         unmatchedRun = { runId: result.run_id, unmatched: result.unmatched };
       }
     } catch (err) {
-      if (destroyed || listId !== currentListId) return;
+      if (!isCurrent()) return;
       const message = groupingErrorMessage(err);
       if (message) notify({ message, severity: "error" });
     } finally {
-      groupingItems = false;
-      reorderingItems = false;
+      if (isCurrent()) {
+        groupingItems = false;
+        reorderingItems = false;
+      }
     }
     // Picks up adds or ticks from other tabs that the server re-read missed.
-    if (!destroyed && listId === currentListId) void backgroundRefetch();
+    if (isCurrent()) void backgroundRefetch();
   };
 
   const completeCurrentList = async () => {
