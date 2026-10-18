@@ -17,11 +17,17 @@ import type {
   PendingUserOut,
   ConfirmedUserOut,
   GetListResult,
+  ListGroupingOut,
+  TemplateGroupingOut,
+  SendRunOut,
 } from "./types";
 
 export type { GetListResult } from "./types";
 
 const REFETCH_TIMEOUT_MS = 10_000;
+// Longer than the backend's 25s model limit, so its own 503 normally arrives
+// first; this only catches a hung connection.
+export const GROUPING_TIMEOUT_MS = 35_000;
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
@@ -121,6 +127,20 @@ async function fetchJson<T>(
   }
 }
 
+async function fetchJsonWithTimeout<T>(
+  path: string,
+  init: RequestInit,
+  timeoutMs: number
+): Promise<T> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetchJson<T>(path, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 export const api = {
   getMe: () => fetchJson<UserOut>("/me"),
 
@@ -203,6 +223,15 @@ export const api = {
       body: JSON.stringify({ item_ids: itemIds }),
     }),
 
+  groupListItems: (listId: string) =>
+    fetchJsonWithTimeout<ListGroupingOut>(
+      `/lists/${listId}/group`,
+      { method: "POST" },
+      GROUPING_TIMEOUT_MS
+    ),
+  sendGroupingRun: (runId: string) =>
+    fetchJson<SendRunOut>(`/grouping-runs/${runId}/send`, { method: "POST" }),
+
   listTemplates: () => fetchJson<TemplateOut[]>("/templates"),
   createTemplate: (payload: TemplateCreate) =>
     fetchJson<TemplateDetailOut>("/templates", {
@@ -244,6 +273,13 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ item_ids: itemIds }),
     }),
+
+  groupTemplateItems: (templateId: string) =>
+    fetchJsonWithTimeout<TemplateGroupingOut>(
+      `/templates/${templateId}/group`,
+      { method: "POST" },
+      GROUPING_TIMEOUT_MS
+    ),
 
   createListFromTemplate: (
     templateId: string,
