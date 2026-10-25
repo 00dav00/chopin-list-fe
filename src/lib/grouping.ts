@@ -18,17 +18,26 @@ export const mergeGroupedItems = <T extends { id: string }>(
 };
 
 /**
+ * The server's own copy for a refusal (409/422), which is written for people.
+ * Request-validation 422s carry a list instead, so only text is used.
+ */
+export const refusalDetail = (err: unknown): string | null =>
+  err instanceof ApiError &&
+  (err.status === 409 || err.status === 422) &&
+  typeof err.detail === "string" &&
+  err.detail
+    ? err.detail
+    : null;
+
+/** A failed write, or null to stay silent (401 re-auth). For admin pages. */
+export const failureMessage = (err: unknown, message: string): string | null =>
+  getApiErrorMessage(err, message) ? message : null;
+
+/**
  * Copy for a failed grouping, or null to stay silent (401 re-auth). Refusals
- * (409/422) carry human copy from the server; anything else is "try again".
+ * carry the server's copy; anything else is "try again".
  */
 export const groupingErrorMessage = (err: unknown): string | null => {
   if (!getApiErrorMessage(err, GROUPING_RETRY_MESSAGE)) return null;
-  if (
-    err instanceof ApiError &&
-    (err.status === 409 || err.status === 422) &&
-    err.detail
-  ) {
-    return err.detail;
-  }
-  return GROUPING_RETRY_MESSAGE;
+  return refusalDetail(err) ?? GROUPING_RETRY_MESSAGE;
 };

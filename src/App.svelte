@@ -20,6 +20,8 @@ import ListDetail from "./routes/ListDetail.svelte";
   import TemplateDetail from "./routes/TemplateDetail.svelte";
   import PendingUsers from "./routes/PendingUsers.svelte";
   import ActiveUsers from "./routes/ActiveUsers.svelte";
+  import AdminGroups from "./routes/AdminGroups.svelte";
+  import UnmatchedItems from "./routes/UnmatchedItems.svelte";
   import NotFound from "./routes/NotFound.svelte";
   import Notices from "./lib/Notices.svelte";
 
@@ -34,6 +36,8 @@ import ListDetail from "./routes/ListDetail.svelte";
     "/templates/:templateId": TemplateDetail,
     "/admin/pending-users": PendingUsers,
     "/admin/active-users": ActiveUsers,
+    "/admin/groups": AdminGroups,
+    "/admin/unmatched-items": UnmatchedItems,
     "*": NotFound,
   };
 
