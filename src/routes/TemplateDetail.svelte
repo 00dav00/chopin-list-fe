@@ -4,9 +4,15 @@
   import { api } from "../lib/api";
   import ConfirmDialog from "../lib/ConfirmDialog.svelte";
   import { getApiErrorMessage } from "../lib/errors";
+  import { groupingErrorMessage, mergeGroupedItems } from "../lib/grouping";
   import { notify, clearNotices } from "../lib/notices";
   import NavMenu from "../lib/NavMenu.svelte";
-  import type { TemplateDetailOut, TemplateItemOut } from "../lib/types";
+  import type {
+    TemplateDetailOut,
+    TemplateItemOut,
+    UnmatchedItemOut,
+  } from "../lib/types";
+  import UnmatchedItemsDialog from "../lib/UnmatchedItemsDialog.svelte";
   import { authStore } from "../stores/auth";
 
   export let params: { templateId?: string } = {};
@@ -43,6 +49,12 @@
   let createListModalOpen = false;
 
   let reorderingItems = false;
+  let groupingItems = false;
+  // Bumped on template switch so a grouping for the previous template can't
+  // touch this template's state when it finally answers.
+  let groupRunToken = 0;
+  let unmatchedRun: { runId: string; unmatched: UnmatchedItemOut[] } | null = null;
+  let destroyed = false;
   let draggedItemId: string | null = null;
   let dragOverItemId: string | null = null;
 
@@ -81,10 +93,12 @@
       );
     });
 
+  // Never below the item count: grouping renumbers 0..N-1, so an item added
+  // while it runs must still sort after the grouped ones.
   const nextSortOrder = (currentItems: TemplateItemOut[]) =>
     currentItems.reduce((maxSortOrder, item) => {
       return item.sort_order > maxSortOrder ? item.sort_order : maxSortOrder;
-    }, 0) + 1;
+    }, currentItems.length) + 1;
 
   const moveTemplateItem = (
     currentItems: TemplateItemOut[],
@@ -255,7 +269,9 @@
         );
         items = sortItems(updated);
       } else {
-        items = sortItems([...previousItems, created]);
+        // Current items, not the pre-request copy: a grouping that finished
+        // meanwhile must not be undone.
+        items = sortItems([...items, created]);
       }
       newItemName = "";
       newItemQty = "1";
@@ -269,7 +285,7 @@
         // since the template is still fully visible: the copy regains the
         // guidance the user needs ("drag it to reorder"). Local state appends
         // the item so the template reflects reality.
-        items = sortItems([...previousItems, created]);
+        items = sortItems([...items, created]);
         notify({
           message:
             "Item added, but we couldn't place it where you wanted — it's at the bottom. Drag it to reorder.",
@@ -453,13 +469,47 @@
     if (currentTemplateId) {
       // Switching templates mid-session: drop the previous template's notices.
       clearNotices();
+      groupRunToken++;
+      groupingItems = false;
+      reorderingItems = false;
+      unmatchedRun = null;
     }
     currentTemplateId = params.templateId;
     loadTemplate(currentTemplateId);
   }
 
   // Leaving the page entirely — drop any lingering mutation notices.
-  onDestroy(clearNotices);
+  onDestroy(() => {
+    destroyed = true;
+    clearNotices();
+  });
+
+  const groupItems = async () => {
+    if (!template || groupingItems || reorderingItems || items.length === 0) return;
+    const templateId = template.id;
+    const token = ++groupRunToken;
+    const isCurrent = () => !destroyed && token === groupRunToken;
+    // reorderingItems blocks drag, up/down and gap inserts while this runs.
+    groupingItems = true;
+    reorderingItems = true;
+    try {
+      const result = await api.groupTemplateItems(templateId);
+      if (!isCurrent()) return;
+      items = sortItems(mergeGroupedItems(result.items, items));
+      if (result.run_id && result.unmatched.length > 0) {
+        unmatchedRun = { runId: result.run_id, unmatched: result.unmatched };
+      }
+    } catch (err) {
+      if (!isCurrent()) return;
+      const message = groupingErrorMessage(err);
+      if (message) notify({ message, severity: "error" });
+    } finally {
+      if (isCurrent()) {
+        groupingItems = false;
+        reorderingItems = false;
+      }
+    }
+  };
 </script>
 
 <main>
@@ -515,6 +565,21 @@
         <div>
           <h2>Template items ({items.length})</h2>
           <p class="meta">Add the staples you always buy.</p>
+        </div>
+        <div class="toolbar">
+          <button
+            class="button ghost"
+            type="button"
+            aria-busy={groupingItems}
+            disabled={groupingItems || reorderingItems || items.length === 0}
+            on:click={groupItems}
+          >
+            {#if groupingItems}
+              <span class="spinner" aria-hidden="true"></span>Grouping...
+            {:else}
+              Group by kind
+            {/if}
+          </button>
         </div>
       </div>
 
@@ -678,6 +743,11 @@
     </button>
 
   {/if}
+  <UnmatchedItemsDialog
+    runId={unmatchedRun?.runId ?? null}
+    unmatched={unmatchedRun?.unmatched ?? []}
+    on:close={() => (unmatchedRun = null)}
+  />
 </main>
 
 {#if addItemModalOpen}

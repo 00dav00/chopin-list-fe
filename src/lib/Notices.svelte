@@ -51,6 +51,10 @@
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1 5h2v7h-2V7zm0 9h2v2h-2v-2z" />
           </svg>
+        {:else if notice.severity === "success"}
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+          </svg>
         {:else}
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M12 2 1 21h22L12 2zm-1 7h2v6h-2V9zm0 8h2v2h-2v-2z" />
@@ -116,6 +120,12 @@
   }
   .notice-warning .notice-icon {
     color: #9a6a00;
+  }
+  .notice-success {
+    border-left-color: #1e7d32;
+  }
+  .notice-success .notice-icon {
+    color: #1e7d32;
   }
 
   .notice-icon {

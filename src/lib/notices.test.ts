@@ -37,6 +37,11 @@ describe("notices store", () => {
     expect(get(notices)[0].autoDismissMs).toBeNull();
   });
 
+  it("auto-dismisses success notices after 4s", () => {
+    notify({ message: "Sent", severity: "success" });
+    expect(get(notices)[0].autoDismissMs).toBe(4000);
+  });
+
   it("honours an explicit autoDismissMs override", () => {
     notify({ message: "Custom", severity: "error", autoDismissMs: null });
     expect(get(notices)[0].autoDismissMs).toBeNull();
